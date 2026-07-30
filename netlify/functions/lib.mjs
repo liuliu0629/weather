@@ -172,15 +172,14 @@ export function rainAdvice(weather, hourWindow = 6, thresholds = defaultThreshol
         const peak = rainy.reduce((best, item) => item.rain > best.rain ? item : best, rainy[0]);
         const start = formatHourLabel(first.time);
         const end = formatHourLabel(last.time);
-        const peakTime = formatHourLabel(peak.time);
         return start === end
-          ? `${start}左右有雨，峰值${peak.rain}%`
-          : `${start}-${end}有雨，${peakTime}最高${peak.rain}%`;
+          ? `${start}有雨`
+          : `${start}-${end}有雨`;
       })()
     : "";
-  if (maxRain >= t.heavyRain) return { level: "high", maxRain, text: `${precise || `雨概率${maxRain}%`}；一定带伞。` };
-  if (maxRain >= t.rain) return { level: "mid", maxRain, text: `${precise || `雨概率${maxRain}%`}；建议带伞。` };
-  return { level: "none", maxRain, text: `雨概率${maxRain}%，一般不用伞。` };
+  if (maxRain >= t.heavyRain) return { level: "high", maxRain, text: `${precise || `雨概率${maxRain}%`}；带伞。` };
+  if (maxRain >= t.rain) return { level: "mid", maxRain, text: `${precise || `雨概率${maxRain}%`}；带伞。` };
+  return { level: "none", maxRain, text: "少雨。" };
 }
 
 export function clothesAdvice(weather, hours, thresholds = defaultThresholds) {
@@ -190,12 +189,12 @@ export function clothesAdvice(weather, hours, thresholds = defaultThresholds) {
   const min = Math.round(weather.daily?.temperature_2m_min?.[0] ?? Math.min(...hours.map((item) => item.temp)));
   const diff = max - min;
   let wear = "";
-  if (apparent >= t.hot + 3) wear = "很热，短袖短裤、透气鞋";
-  else if (apparent >= t.hot) wear = "偏热，穿轻薄短袖";
-  else if (apparent >= 23) wear = "体感舒适偏暖，短袖或薄长袖都可以";
-  else if (apparent >= t.cold) wear = "早晚可能凉，可带薄外套";
-  else if (apparent >= 10) wear = "偏凉，建议外套、长裤";
-  else wear = "较冷，建议厚外套和保暖内搭";
+  if (apparent >= t.hot + 3) wear = "很热，短袖短裤";
+  else if (apparent >= t.hot) wear = "偏热，轻薄短袖";
+  else if (apparent >= 23) wear = "短袖或薄长袖";
+  else if (apparent >= t.cold) wear = "可带薄外套";
+  else if (apparent >= 10) wear = "外套、长裤";
+  else wear = "厚外套保暖";
   const change = diff >= t.tempDiff
     ? `温差${diff}℃，分层穿。`
     : apparent >= t.hot
@@ -217,11 +216,11 @@ export function makeDetailedAdvice(place, weather, hourWindow = 6, thresholds = 
   const windText = maxWind >= t.wind + 9 ? `风很大，最高${maxWind}km/h，骑车打伞小心。`
     : maxWind >= t.wind ? `风偏大，最高${maxWind}km/h。`
     : "风不大。";
-  const sunText = uv >= t.uv + 3 ? "紫外线很强，防晒霜/帽子/太阳镜。"
-    : uv >= t.uv || clothes.max >= t.hot ? "日晒偏强，注意防晒。"
-    : "日晒不强。";
+  const sunText = uv >= t.uv + 3 ? "强防晒。"
+    : uv >= t.uv || clothes.max >= t.hot ? "注意防晒。"
+    : "";
   const title = "天气出门建议";
-  const body = `${displayPlaceName(place)}：${weatherName}，体感${clothes.apparent}℃。${rain.text} ${clothes.text} ${sunText}`;
+  const body = `${displayPlaceName(place)}：${weatherName}，体感${clothes.apparent}℃。${[rain.text, clothes.text, sunText].filter(Boolean).join(" ")}`;
   return { title, body, weatherName, rain, clothes, maxWind, uv, windText, sunText };
 }
 
@@ -259,5 +258,12 @@ export function scheduleDue(timeText, toleranceMinutes = 15) {
 }
 
 export function displayPlaceName(place) {
-  return place.detailName || place.name || "当前位置";
+  const provinceCity = `${place.admin1 || ""}${place.name || ""}`;
+  const district = place.district || "";
+  const township = place.township || "";
+  if (/北京/.test(provinceCity)) return district || "北京";
+  if (township) return `${district && !township.includes(district) ? district : ""}${township}`;
+  if (district) return district;
+  const name = place.name || "当前位置";
+  return name.length > 8 ? "当前位置" : name;
 }

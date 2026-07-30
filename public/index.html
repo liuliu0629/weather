@@ -327,6 +327,18 @@
         return [place.name, place.admin1, place.country].filter(Boolean).join(" · ");
       }
 
+      function shortPlaceName() {
+        const place = state.place || {};
+        const provinceCity = `${place.admin1 || ""}${place.name || ""}`;
+        const district = place.district || "";
+        const township = place.township || "";
+        if (/北京/.test(provinceCity)) return district || "北京";
+        if (township) return `${district && !township.includes(district) ? district : ""}${township}`;
+        if (district) return district;
+        const name = place.name || "当前位置";
+        return name.length > 8 ? "当前位置" : name;
+      }
+
       function displayLead(minutesText) {
         const minutes = Number(minutesText);
         if (!Number.isFinite(minutes)) return "未设置";
@@ -529,9 +541,9 @@
         const maxRain = Math.max(0, ...hours.map((item) => item.rain));
         const firstRain = hours.find((item) => item.rain >= t.rain || [51,53,55,61,63,65,80,81,82,95,96,99].includes(item.code));
         const timeText = firstRain ? `，约${formatHourLabel(firstRain.time)}起` : "";
-        if (maxRain >= t.heavyRain) return { level: "high", text: `有雨${timeText}，一定带伞。`, maxRain };
-        if (maxRain >= t.rain) return { level: "mid", text: `可能有雨${timeText}，建议带伞。`, maxRain };
-        return { level: "none", text: `雨概率${maxRain}%，一般不用伞。`, maxRain };
+        if (maxRain >= t.heavyRain) return { level: "high", text: `有雨${timeText}，带伞。`, maxRain };
+        if (maxRain >= t.rain) return { level: "mid", text: `可能有雨${timeText}，带伞。`, maxRain };
+        return { level: "none", text: `少雨。`, maxRain };
       }
 
       function preciseRainAdvice(weather) {
@@ -546,8 +558,8 @@
         const start = formatHourLabel(first.time);
         const end = formatHourLabel(last.time);
         const peakTime = formatHourLabel(peak.time);
-        if (start === end) return `${start}左右有雨，峰值${peak.rain}%`;
-        return `${start}-${end}有雨，${peakTime}最高${peak.rain}%`;
+        if (start === end) return `${start}有雨`;
+        return `${start}-${end}有雨`;
       }
 
       function clothesAdvice(weather, hours) {
@@ -558,12 +570,12 @@
         const dayMin = Math.round(weather.daily?.temperature_2m_min?.[0] ?? Math.min(...hours.map((item) => item.temp)));
         const diff = dayMax - dayMin;
         let wear = "";
-        if (apparent >= t.hot + 3) wear = "很热，短袖短裤、透气鞋";
-        else if (apparent >= t.hot) wear = "偏热，穿轻薄短袖";
-        else if (apparent >= 23) wear = "体感舒适偏暖，短袖或薄长袖都可以";
-        else if (apparent >= t.cold) wear = "早晚可能凉，可带薄外套";
-        else if (apparent >= 10) wear = "偏凉，建议外套、长裤";
-        else wear = "较冷，建议厚外套和保暖内搭";
+        if (apparent >= t.hot + 3) wear = "很热，短袖短裤";
+        else if (apparent >= t.hot) wear = "偏热，轻薄短袖";
+        else if (apparent >= 23) wear = "短袖或薄长袖";
+        else if (apparent >= t.cold) wear = "可带薄外套";
+        else if (apparent >= 10) wear = "外套、长裤";
+        else wear = "厚外套保暖";
 
         const change = diff >= t.tempDiff ? `温差${diff}℃，分层穿。` :
           apparent >= t.hot ? "注意补水。" :
@@ -584,9 +596,9 @@
         const t = sanitizeThresholds(state.thresholds);
         const uv = Math.round(weather.daily?.uv_index_max?.[0] ?? 0);
         const maxTemp = Math.round(weather.daily?.temperature_2m_max?.[0] ?? weather.current.temperature_2m);
-        if (uv >= t.uv + 3) return { text: `紫外线很强，防晒霜/帽子/太阳镜。`, uv };
-        if (uv >= t.uv || maxTemp >= t.hot) return { text: `日晒偏强，注意防晒。`, uv };
-        return { text: `日晒不强。`, uv };
+        if (uv >= t.uv + 3) return { text: `强防晒。`, uv };
+        if (uv >= t.uv || maxTemp >= t.hot) return { text: `注意防晒。`, uv };
+        return { text: ``, uv };
       }
 
       function comfortAdvice(weather, hours) {
@@ -608,7 +620,8 @@
         const comfort = comfortAdvice(weather, hours);
         const title = "天气出门建议";
         const rainText = preciseRain ? `${preciseRain}；${rain.text}` : rain.text;
-        const body = `${state.place.name}：${name}，体感${clothes.apparent}℃。${rainText} ${clothes.text} ${sun.text}`;
+        const extras = [rainText, clothes.text, sun.text].filter(Boolean).join(" ");
+        const body = `${shortPlaceName()}：${name}，体感${clothes.apparent}℃。${extras}`;
         const short = body;
         return { title, body, short, rain, preciseRain, rainText, clothes, wind, sun };
       }
@@ -754,6 +767,8 @@
         state.place = {
           name: place.name || "我的位置",
           admin1: place.admin1 || "",
+          district: place.district || "",
+          township: place.township || "",
           country: place.country || "",
           latitude: place.latitude,
           longitude: place.longitude,
@@ -932,6 +947,8 @@
           return {
             name: data.name || data.city || "我的位置",
             admin1: data.admin1 || "",
+            district: data.district || "",
+            township: data.township || "",
             country: data.country || "",
             detailName: data.detailName || data.formattedAddress || "",
             latitude,
@@ -940,6 +957,40 @@
         } catch {
           return { name: "我的位置", latitude, longitude };
         }
+      }
+
+      function applyLocatedPlace(place) {
+        state.place = place;
+        state.locationDetail = place.detailName || state.locationDetail;
+        state.places = [];
+        state.placeResults = [];
+        $("cityInput").value = state.locationDetail || state.place.name;
+        save();
+        render();
+      }
+
+      async function autoRefreshLocationOnOpen() {
+        if (!navigator.geolocation) return;
+        try {
+          const permission = navigator.permissions?.query
+            ? await navigator.permissions.query({ name: "geolocation" })
+            : null;
+          if (permission && permission.state !== "granted") return;
+        } catch {
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const place = await reverseGeocode(position.coords.latitude, position.coords.longitude);
+            const oldKey = `${state.place.latitude},${state.place.longitude}`;
+            const newKey = `${place.latitude},${place.longitude}`;
+            applyLocatedPlace(place);
+            await syncServerSettings();
+            if (oldKey !== newKey) refreshWeather(false);
+          },
+          () => {},
+          { enableHighAccuracy: true, timeout: 12000, maximumAge: 10 * 60 * 1000 }
+        );
       }
 
       function useCurrentLocation() {
@@ -953,13 +1004,7 @@
             const latitude = position.coords.latitude;
             const longitude = position.coords.longitude;
             setMessage("定位成功，正在识别城市…");
-            state.place = await reverseGeocode(latitude, longitude);
-            state.locationDetail = state.place.detailName || state.locationDetail;
-            state.places = [];
-            state.placeResults = [];
-            $("cityInput").value = state.locationDetail || state.place.name;
-            save();
-            render();
+            applyLocatedPlace(await reverseGeocode(latitude, longitude));
             await syncServerSettings();
             refreshWeather();
           },
@@ -1108,6 +1153,7 @@
       updatePermissionLabel();
       if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
       refreshWeather(false);
+      autoRefreshLocationOnOpen();
       scheduleAllReminders();
       setInterval(() => refreshWeather(false), 15 * 60 * 1000);
     </script>
