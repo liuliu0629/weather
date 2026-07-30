@@ -10,7 +10,7 @@ export default async function handler(request) {
   }
 
   const weather = await fetchWeather(body.place);
-  const advice = makeDetailedAdvice(body.place, weather, 6);
+  const advice = makeDetailedAdvice(body.place, weather, 6, body.thresholds);
   const webpush = setupWebPush();
   await webpush.sendNotification(
     body.subscription,

@@ -16,6 +16,7 @@ export default async function handler(request) {
     leadTime: body.leadTime || "180",
     schedules: Array.isArray(body.schedules) ? body.schedules : [],
     rules: body.rules || {},
+    thresholds: body.thresholds || {},
     itinerary: body.itinerary || "",
     userAgent: request.headers.get("user-agent") || "",
     createdAt: body.createdAt || new Date().toISOString()

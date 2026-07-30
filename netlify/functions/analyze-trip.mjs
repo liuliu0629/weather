@@ -64,7 +64,7 @@ export default async function handler(request) {
   const weather = await fetchWeather(body.place);
   const items = parseItinerary(body.itinerary);
   const tomorrow = /明天/.test(body.itinerary);
-  const fallback = makeDetailedAdvice(body.place, weather, 12);
+  const fallback = makeDetailedAdvice(body.place, weather, 12, body.thresholds);
   const lines = items.length
     ? items.map((item) => adviceForTripItem(weather, item, tomorrow, body.itinerary))
     : [fallback.body];

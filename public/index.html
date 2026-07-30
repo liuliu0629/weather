@@ -99,6 +99,10 @@
       .message { margin: 14px 0 0; border-radius: 20px; padding: 13px 15px; background: #f1f5f9; color: #475569; font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
       .itinerary-result { margin-top: 10px; border-radius: 20px; padding: 13px 15px; background: #ecfeff; color: #155e75; font-size: 14px; line-height: 1.65; white-space: pre-wrap; }
       .standards { margin: 10px 0 0; padding-left: 18px; color: #64748b; font-size: 12px; line-height: 1.65; }
+      .thresholds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+      .threshold { border-radius: 18px; padding: 10px 12px; background: white; box-shadow: 0 6px 18px rgba(15,23,42,.07); }
+      .threshold span { display: block; color: #64748b; font-size: 12px; font-weight: 900; }
+      .threshold input { width: 100%; margin-top: 7px; border-radius: 14px; padding: 10px 11px; font-weight: 900; }
       .note { margin: 10px 0 0; color: #94a3b8; font-size: 12px; line-height: 1.55; }
 
       @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
@@ -107,7 +111,7 @@
         .nav { align-items: flex-start; }
         .hero, .panel { border-radius: 28px; padding: 18px; }
         .weather-name { margin-top: 50px; }
-        .stats, .actions { grid-template-columns: 1fr; }
+        .stats, .actions, .thresholds { grid-template-columns: 1fr; }
         .search, .schedule-row { flex-direction: column; }
       }
     </style>
@@ -186,13 +190,19 @@
 
           <div class="box">
             <label class="title">天气变化提醒标准</label>
-            <ul class="standards">
-              <li>下雨：未来窗口内降雨概率 ≥ 45% 提醒带伞；≥ 70% 提醒一定带伞。</li>
-              <li>穿衣：体感 ≥ 30℃ 建议减衣/轻薄短袖；体感 ≤ 18℃ 建议添外套。</li>
-              <li>温差：当天最高最低温差 ≥ 9℃ 提醒分层穿，早晚加衣、中午减衣。</li>
-              <li>防晒：紫外线指数 ≥ 5 或最高温 ≥ 30℃ 提醒防晒/太阳镜。</li>
-              <li>大风：未来风速 ≥ 30 km/h 提醒骑车、打伞、帽子注意。</li>
-            </ul>
+            <div class="thresholds">
+              <label class="threshold"><span>带伞概率 ≥ %</span><input id="rainThresholdInput" type="number" min="1" max="100" /></label>
+              <label class="threshold"><span>一定带伞 ≥ %</span><input id="heavyRainThresholdInput" type="number" min="1" max="100" /></label>
+              <label class="threshold"><span>热提醒 ≥ ℃</span><input id="hotThresholdInput" type="number" min="-20" max="60" /></label>
+              <label class="threshold"><span>冷提醒 ≤ ℃</span><input id="coldThresholdInput" type="number" min="-30" max="40" /></label>
+              <label class="threshold"><span>温差提醒 ≥ ℃</span><input id="tempDiffThresholdInput" type="number" min="1" max="30" /></label>
+              <label class="threshold"><span>大风提醒 ≥ km/h</span><input id="windThresholdInput" type="number" min="1" max="120" /></label>
+            </div>
+            <div class="search" style="margin-top: 10px;">
+              <input id="uvThresholdInput" type="number" min="1" max="12" placeholder="防晒：紫外线指数 ≥" />
+              <button class="ghost" id="saveThresholdsButton">保存标准</button>
+            </div>
+            <p class="note" id="thresholdSummary"></p>
           </div>
 
           <div class="box">
@@ -249,6 +259,16 @@
         sun: ["防晒提醒", "紫外线较强或晴热时提醒防晒、太阳镜。", "防晒"]
       };
 
+      const defaultThresholds = {
+        rain: 45,
+        heavyRain: 70,
+        hot: 30,
+        cold: 18,
+        tempDiff: 9,
+        uv: 5,
+        wind: 30
+      };
+
       const state = {
         place: presets[0],
         leadTime: "180",
@@ -256,6 +276,7 @@
         locationDetail: "",
         timers: [],
         rules: { daily: true, rain: true, clothes: true, wind: true, sun: true },
+        thresholds: { ...defaultThresholds },
         places: [],
         placeResults: [],
         weather: null,
@@ -272,7 +293,8 @@
           leadTime: state.leadTime,
           schedules: state.schedules,
           locationDetail: state.locationDetail,
-          rules: state.rules
+          rules: state.rules,
+          thresholds: state.thresholds
         }));
       }
 
@@ -290,6 +312,7 @@
               : ["07:30"];
           state.locationDetail = parsed.locationDetail || parsed.place?.detailName || "";
           state.rules = { ...state.rules, ...(parsed.rules || {}) };
+          state.thresholds = sanitizeThresholds(parsed.thresholds);
           $("cityInput").value = state.locationDetail || state.place.name;
           $("scheduleTime").value = state.schedules[0] || "07:30";
         } catch {}
@@ -324,6 +347,50 @@
         }
         const numeric = Number(text);
         return Number.isFinite(numeric) ? Math.round(numeric) : null;
+      }
+
+      function clampNumber(value, fallback, min, max) {
+        const number = Math.round(Number(value));
+        if (!Number.isFinite(number)) return fallback;
+        return Math.min(max, Math.max(min, number));
+      }
+
+      function sanitizeThresholds(value = {}) {
+        const merged = { ...defaultThresholds, ...(value || {}) };
+        return {
+          rain: clampNumber(merged.rain, defaultThresholds.rain, 1, 100),
+          heavyRain: clampNumber(merged.heavyRain, defaultThresholds.heavyRain, 1, 100),
+          hot: clampNumber(merged.hot, defaultThresholds.hot, -20, 60),
+          cold: clampNumber(merged.cold, defaultThresholds.cold, -30, 40),
+          tempDiff: clampNumber(merged.tempDiff, defaultThresholds.tempDiff, 1, 30),
+          uv: clampNumber(merged.uv, defaultThresholds.uv, 1, 12),
+          wind: clampNumber(merged.wind, defaultThresholds.wind, 1, 120)
+        };
+      }
+
+      function readThresholdInputs() {
+        return sanitizeThresholds({
+          rain: $("rainThresholdInput").value,
+          heavyRain: $("heavyRainThresholdInput").value,
+          hot: $("hotThresholdInput").value,
+          cold: $("coldThresholdInput").value,
+          tempDiff: $("tempDiffThresholdInput").value,
+          uv: $("uvThresholdInput").value,
+          wind: $("windThresholdInput").value
+        });
+      }
+
+      function updateThresholdInputs() {
+        const t = sanitizeThresholds(state.thresholds);
+        state.thresholds = t;
+        $("rainThresholdInput").value = t.rain;
+        $("heavyRainThresholdInput").value = t.heavyRain;
+        $("hotThresholdInput").value = t.hot;
+        $("coldThresholdInput").value = t.cold;
+        $("tempDiffThresholdInput").value = t.tempDiff;
+        $("uvThresholdInput").value = t.uv;
+        $("windThresholdInput").value = t.wind;
+        $("thresholdSummary").textContent = `当前：雨≥${t.rain}%；一定带伞≥${t.heavyRain}%；热≥${t.hot}℃；冷≤${t.cold}℃；温差≥${t.tempDiff}℃；UV≥${t.uv}；风≥${t.wind} km/h。`;
       }
 
       function setMessage(text) {
@@ -398,6 +465,7 @@
             leadTime: state.leadTime,
             schedules: state.schedules,
             rules: state.rules,
+            thresholds: state.thresholds,
             itinerary: $("itineraryInput")?.value || "",
             createdAt: new Date().toISOString()
           })
@@ -457,18 +525,20 @@
       }
 
       function rainAdvice(hours) {
+        const t = sanitizeThresholds(state.thresholds);
         const maxRain = Math.max(0, ...hours.map((item) => item.rain));
-        const firstRain = hours.find((item) => item.rain >= 45 || [51,53,55,61,63,65,80,81,82,95,96,99].includes(item.code));
-        if (maxRain >= 70) return { level: "high", text: `大概率下雨${firstRain ? "，约 " + formatHourLabel(firstRain.time) + " 开始风险升高" : ""}，建议一定带伞。`, maxRain };
-        if (maxRain >= 45) return { level: "mid", text: `可能下雨，最高降雨概率 ${maxRain}%，建议带一把轻便伞。`, maxRain };
-        if (maxRain >= 25) return { level: "low", text: `有一点降雨可能，最高 ${maxRain}%，长时间在外可备伞。`, maxRain };
-        return { level: "none", text: `基本不下雨，最高降雨概率 ${maxRain}%，通常不用带伞。`, maxRain };
+        const firstRain = hours.find((item) => item.rain >= t.rain || [51,53,55,61,63,65,80,81,82,95,96,99].includes(item.code));
+        const timeText = firstRain ? `，约${formatHourLabel(firstRain.time)}起` : "";
+        if (maxRain >= t.heavyRain) return { level: "high", text: `有雨${timeText}，一定带伞。`, maxRain };
+        if (maxRain >= t.rain) return { level: "mid", text: `可能有雨${timeText}，建议带伞。`, maxRain };
+        return { level: "none", text: `雨概率${maxRain}%，一般不用伞。`, maxRain };
       }
 
       function preciseRainAdvice(weather) {
         const slots = upcomingRainSlots(weather, Math.max(6, Number(state.leadTime) / 60));
+        const t = sanitizeThresholds(state.thresholds);
         if (!slots.length) return null;
-        const rainy = slots.filter((item) => item.rain >= 45 || item.precipitation > 0 || [51,53,55,61,63,65,80,81,82,95,96,99].includes(item.code));
+        const rainy = slots.filter((item) => item.rain >= t.rain || item.precipitation > 0 || [51,53,55,61,63,65,80,81,82,95,96,99].includes(item.code));
         if (!rainy.length) return null;
         const first = rainy[0];
         const peak = rainy.reduce((best, item) => item.rain > best.rain ? item : best, rainy[0]);
@@ -476,44 +546,47 @@
         const start = formatHourLabel(first.time);
         const end = formatHourLabel(last.time);
         const peakTime = formatHourLabel(peak.time);
-        if (start === end) return `预计 ${start} 左右有雨，最高概率约 ${peak.rain}%。`;
-        return `预计 ${start} 到 ${end} 有雨，${peakTime} 左右概率最高（约 ${peak.rain}%）。`;
+        if (start === end) return `${start}左右有雨，峰值${peak.rain}%`;
+        return `${start}-${end}有雨，${peakTime}最高${peak.rain}%`;
       }
 
       function clothesAdvice(weather, hours) {
+        const t = sanitizeThresholds(state.thresholds);
         const current = Math.round(weather.current.temperature_2m);
         const apparent = Math.round(weather.current.apparent_temperature ?? weather.current.temperature_2m);
         const dayMax = Math.round(weather.daily?.temperature_2m_max?.[0] ?? Math.max(...hours.map((item) => item.temp)));
         const dayMin = Math.round(weather.daily?.temperature_2m_min?.[0] ?? Math.min(...hours.map((item) => item.temp)));
         const diff = dayMax - dayMin;
         let wear = "";
-        if (apparent >= 33) wear = "体感很热，建议短袖短裤、透气鞋，尽量少穿深色厚衣服";
-        else if (apparent >= 28) wear = "体感偏热，建议轻薄短袖、短裤或薄长裤";
+        if (apparent >= t.hot + 3) wear = "很热，短袖短裤、透气鞋";
+        else if (apparent >= t.hot) wear = "偏热，穿轻薄短袖";
         else if (apparent >= 23) wear = "体感舒适偏暖，短袖或薄长袖都可以";
-        else if (apparent >= 17) wear = "早晚可能凉，建议长袖或带一件薄外套";
+        else if (apparent >= t.cold) wear = "早晚可能凉，可带薄外套";
         else if (apparent >= 10) wear = "偏凉，建议外套、长裤";
         else wear = "较冷，建议厚外套和保暖内搭";
 
-        const change = diff >= 9 ? `昼夜温差约 ${diff}℃，建议分层穿，早晚加衣、中午可减衣。` :
-          apparent >= 30 ? "今天偏热，不建议添衣，出汗后注意补水。" :
-          apparent <= 18 ? "体感偏凉，建议添一件外套。" :
+        const change = diff >= t.tempDiff ? `温差${diff}℃，分层穿。` :
+          apparent >= t.hot ? "注意补水。" :
+          apparent <= t.cold ? "建议添一件外套。" :
           "温差不大，正常穿着即可。";
         return { text: `${wear}。${change}`, current, apparent, dayMax, dayMin, diff };
       }
 
       function windAdvice(hours) {
+        const t = sanitizeThresholds(state.thresholds);
         const maxWind = Math.round(Math.max(0, ...hours.map((item) => item.wind)));
-        if (maxWind >= 39) return { text: `风很大，最高约 ${maxWind} km/h，骑车和打伞都要小心。`, maxWind };
-        if (maxWind >= 30) return { text: `风偏大，最高约 ${maxWind} km/h，建议固定帽子，伞选结实一点。`, maxWind };
-        return { text: `风不大，最高约 ${maxWind} km/h。`, maxWind };
+        if (maxWind >= t.wind + 9) return { text: `风很大，最高${maxWind}km/h，骑车打伞小心。`, maxWind };
+        if (maxWind >= t.wind) return { text: `风偏大，最高${maxWind}km/h。`, maxWind };
+        return { text: `风不大。`, maxWind };
       }
 
       function sunAdvice(weather) {
+        const t = sanitizeThresholds(state.thresholds);
         const uv = Math.round(weather.daily?.uv_index_max?.[0] ?? 0);
         const maxTemp = Math.round(weather.daily?.temperature_2m_max?.[0] ?? weather.current.temperature_2m);
-        if (uv >= 8) return { text: `紫外线很强，建议防晒霜、太阳镜、帽子，尽量避开正午暴晒。`, uv };
-        if (uv >= 5 || maxTemp >= 30) return { text: `紫外线/日晒偏强，建议防晒和太阳镜。`, uv };
-        return { text: `日晒压力不高，普通防护即可。`, uv };
+        if (uv >= t.uv + 3) return { text: `紫外线很强，防晒霜/帽子/太阳镜。`, uv };
+        if (uv >= t.uv || maxTemp >= t.hot) return { text: `日晒偏强，注意防晒。`, uv };
+        return { text: `日晒不强。`, uv };
       }
 
       function comfortAdvice(weather, hours) {
@@ -533,10 +606,10 @@
         const wind = windAdvice(hours);
         const sun = sunAdvice(weather);
         const comfort = comfortAdvice(weather, hours);
-        const title = "明早出门建议";
-        const rainText = preciseRain ? `${preciseRain} ${rain.text}` : rain.text;
-        const body = `${state.place.name} ${formatChineseDate()}天气早报：${name}，${comfort} ${rainText} ${clothes.text} ${sun.text} ${wind.text}`;
-        const short = `${name}，体感 ${clothes.apparent}℃。${rainText} ${clothes.text}`;
+        const title = "天气出门建议";
+        const rainText = preciseRain ? `${preciseRain}；${rain.text}` : rain.text;
+        const body = `${state.place.name}：${name}，体感${clothes.apparent}℃。${rainText} ${clothes.text} ${sun.text}`;
+        const short = body;
         return { title, body, short, rain, preciseRain, rainText, clothes, wind, sun };
       }
 
@@ -723,6 +796,7 @@
         $("placeBaseLabel").textContent = state.locationDetail ? formatPlaceBase(state.place) : "";
         $("leadStat").textContent = displayLead(state.leadTime);
         updatePermissionLabel();
+        updateThresholdInputs();
 
         $("chips").innerHTML = "";
         const locationButton = document.createElement("button");
@@ -806,11 +880,12 @@
 
       async function evaluateWeather(weather, mayNotify) {
         const advice = makeDetailedAdvice(weather);
+        const t = sanitizeThresholds(state.thresholds);
         const parts = [];
         if (state.rules.rain && advice.rain.level !== "none") parts.push(advice.rain.text);
-        if (state.rules.clothes) parts.push(advice.clothes.text);
-        if (state.rules.sun && advice.sun.uv >= 5) parts.push(advice.sun.text);
-        if (state.rules.wind && advice.wind.maxWind >= 30) parts.push(advice.wind.text);
+        if (state.rules.clothes && (advice.clothes.apparent >= t.hot || advice.clothes.apparent <= t.cold || advice.clothes.diff >= t.tempDiff)) parts.push(advice.clothes.text);
+        if (state.rules.sun && advice.sun.uv >= t.uv) parts.push(advice.sun.text);
+        if (state.rules.wind && advice.wind.maxWind >= t.wind) parts.push(advice.wind.text);
 
         if (!parts.length) {
           setMessage(state.place.name + " 天气正常：\n" + advice.short);
@@ -911,9 +986,18 @@
         const response = await fetch("/api/test-push", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ subscription: sub, place: { ...state.place, detailName: state.locationDetail } })
+          body: JSON.stringify({ subscription: sub, place: { ...state.place, detailName: state.locationDetail }, thresholds: state.thresholds })
         });
         setMessage(response.ok ? "服务器测试推送已发送。" : "服务器测试推送失败，请检查 Netlify 环境变量。");
+      };
+      $("saveThresholdsButton").onclick = async () => {
+        state.thresholds = readThresholdInputs();
+        save();
+        render();
+        showToast("提醒标准已保存");
+        setMessage("已保存天气变化提醒标准。");
+        if (state.weather) evaluateWeather(state.weather, false);
+        await syncServerSettings();
       };
       $("addScheduleButton").onclick = async () => {
         const sub = await getServerPushSubscription();
@@ -954,7 +1038,7 @@
         const response = await fetch("/api/analyze-trip", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ place: { ...state.place, detailName: state.locationDetail }, itinerary })
+          body: JSON.stringify({ place: { ...state.place, detailName: state.locationDetail }, itinerary, thresholds: state.thresholds })
         });
         const result = await response.json();
         $("itineraryResult").textContent = result.body || "分析失败，请稍后再试。";
@@ -970,7 +1054,7 @@
         const response = await fetch("/api/analyze-trip", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ place: { ...state.place, detailName: state.locationDetail }, itinerary })
+          body: JSON.stringify({ place: { ...state.place, detailName: state.locationDetail }, itinerary, thresholds: state.thresholds })
         });
         const result = await response.json();
         $("itineraryResult").textContent = result.body || "分析失败，请稍后再试。";

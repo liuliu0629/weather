@@ -24,7 +24,7 @@ export default async function handler() {
 
       const weather = await fetchWeather(client.place);
       const hourWindow = Math.max(1, Number(client.leadTime || 180) / 60);
-      const advice = makeDetailedAdvice(client.place, weather, hourWindow);
+      const advice = makeDetailedAdvice(client.place, weather, hourWindow, client.thresholds);
       await webpush.sendNotification(
         client.subscription,
         JSON.stringify({ title: advice.title, body: advice.body, url: "/" }),
