@@ -1,6 +1,25 @@
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M22 19.2727C22 20.779 20.779 22 19.2727 22H14.7273C13.221 22 12 20.779 12 19.2727V12H19.2727C20.779 12 22 13.221 22 14.7273V19.2727Z" fill="#68C4FF"/>
-<path d="M20 2C21.1046 2 22 2.89543 22 4V7C22 8.10457 21.1046 9 20 9H17C15.8954 9 15 8.10457 15 7V4C15 2.89543 15.8954 2 17 2H20Z" fill="#0C79D8"/>
-<path d="M7 15C8.10457 15 9 15.8954 9 17V20C9 21.1046 8.10457 22 7 22H4C2.89543 22 2 21.1046 2 20V17C2 15.8954 2.89543 15 4 15H7Z" fill="#0C79D8"/>
-<path d="M12 12H4.72727C3.22104 12 2 10.779 2 9.27273V4.72727C2 3.22104 3.22104 2 4.72727 2H9.27273C10.779 2 12 3.22104 12 4.72727V12Z" fill="#2E9EFF"/>
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="108" y1="80" x2="405" y2="432" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="0.58" stop-color="#F4FBFF"/>
+      <stop offset="1" stop-color="#DFF3FF"/>
+    </linearGradient>
+    <linearGradient id="arrow" x1="178" y1="336" x2="345" y2="133" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A5E7FF"/>
+      <stop offset="0.45" stop-color="#58B9FF"/>
+      <stop offset="1" stop-color="#2B71EA"/>
+    </linearGradient>
+    <filter id="cardShadow" x="48" y="45" width="416" height="426" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#5E7186" flood-opacity="0.18"/>
+    </filter>
+    <filter id="strokeShadow" x="130" y="96" width="268" height="296" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="8" stdDeviation="7" flood-color="#2B71EA" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+
+  <rect x="58" y="56" width="396" height="396" rx="112" fill="url(#bg)" filter="url(#cardShadow)"/>
+  <path d="M178 344C224 307 271 266 309 216C284 226 248 237 210 244C244 212 282 176 330 134" stroke="url(#arrow)" stroke-width="22" stroke-linecap="round" stroke-linejoin="round" filter="url(#strokeShadow)"/>
+  <path d="M330 134L346 190M330 134L274 148" stroke="url(#arrow)" stroke-width="22" stroke-linecap="round" stroke-linejoin="round" filter="url(#strokeShadow)"/>
+  <path d="M178 344C214 326 244 306 272 280" stroke="#D5F4FF" stroke-width="8" stroke-linecap="round" opacity="0.9"/>
 </svg>

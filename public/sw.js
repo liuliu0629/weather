@@ -1,14 +1,18 @@
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((key) => key !== "weather-ping-v4").map((key) => caches.delete(key))))
+      .then(() => self.clients.claim()),
+  );
+});
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open("weather-ping-v1").then((cache) =>
-      cache.addAll(["/", "/index.html", "/manifest.webmanifest", "/favicon.svg"]),
+    caches.open("weather-ping-v4").then((cache) =>
+      cache.addAll(["/", "/index.html", "/manifest.webmanifest", "/favicon.svg", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"]),
     ),
   );
   self.skipWaiting();
-});
-
-self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
 });
 
 self.addEventListener("fetch", (event) => {
@@ -19,7 +23,7 @@ self.addEventListener("fetch", (event) => {
     fetch(event.request)
       .then((response) => {
         const copy = response.clone();
-        caches.open("weather-ping-v1").then((cache) => cache.put(event.request, copy));
+        caches.open("weather-ping-v4").then((cache) => cache.put(event.request, copy));
         return response;
       })
       .catch(() => caches.match(event.request).then((cached) => cached || caches.match("/"))),
@@ -50,8 +54,8 @@ self.addEventListener("push", (event) => {
   const title = payload.title || "天气提醒";
   const options = {
     body: payload.body || "打开查看最新天气建议。",
-    icon: "/favicon.svg",
-    badge: "/favicon.svg",
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
     tag: payload.tag || "weather-ping-server",
     data: { url: payload.url || "/" }
   };
