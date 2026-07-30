@@ -194,7 +194,7 @@ export function makeDetailedAdvice(place, weather, hourWindow = 6) {
     ? `体感闷热，湿度约 ${humidity}%，建议带水，通勤别走太急。`
     : `体感 ${clothes.apparent}℃，湿度约 ${humidity}%。`;
   const title = "明早出门建议";
-  const body = `${place.name} ${formatChineseDate()}天气早报：${weatherName}，${comfort} ${rain.text} ${clothes.text} ${sunText} ${windText}`;
+  const body = `${displayPlaceName(place)} ${formatChineseDate()}天气早报：${weatherName}，${comfort} ${rain.text} ${clothes.text} ${sunText} ${windText}`;
   return { title, body, weatherName, rain, clothes, maxWind, uv, windText, sunText };
 }
 
@@ -210,10 +210,27 @@ export function minutesNowChina() {
   return hour * 60 + minute;
 }
 
+export function chinaDateKey(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+  const year = parts.find((p) => p.type === "year")?.value;
+  const month = parts.find((p) => p.type === "month")?.value;
+  const day = parts.find((p) => p.type === "day")?.value;
+  return `${year}-${month}-${day}`;
+}
+
 export function scheduleDue(timeText, toleranceMinutes = 15) {
   const [hour, minute] = timeText.split(":").map(Number);
   const target = hour * 60 + minute;
   const now = minutesNowChina();
   const diff = Math.abs(now - target);
   return diff <= toleranceMinutes || Math.abs(diff - 1440) <= toleranceMinutes;
+}
+
+export function displayPlaceName(place) {
+  return place.detailName || place.name || "当前位置";
 }

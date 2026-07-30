@@ -91,6 +91,7 @@
       .actions { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-top: 16px; }
       .message { margin: 14px 0 0; border-radius: 20px; padding: 13px 15px; background: #f1f5f9; color: #475569; font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
       .itinerary-result { margin-top: 10px; border-radius: 20px; padding: 13px 15px; background: #ecfeff; color: #155e75; font-size: 14px; line-height: 1.65; white-space: pre-wrap; }
+      .standards { margin: 10px 0 0; padding-left: 18px; color: #64748b; font-size: 12px; line-height: 1.65; }
       .note { margin: 10px 0 0; color: #94a3b8; font-size: 12px; line-height: 1.55; }
 
       @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
@@ -152,6 +153,10 @@
               <input id="cityInput" type="text" value="上海" placeholder="例如：上海、杭州、深圳" />
               <button class="dark" id="searchButton">搜索</button>
             </div>
+            <div class="search" style="margin-top: 8px;">
+              <input id="detailInput" type="text" placeholder="详细位置名称：例如 XX院 3号楼 / 公司 A座" />
+              <button class="ghost" id="saveDetailButton">保存位置名</button>
+            </div>
             <div class="chips" id="chips"></div>
           </div>
 
@@ -168,6 +173,17 @@
             </div>
             <div class="schedule-list" id="scheduleList"></div>
             <p class="note" id="scheduleHint">可以添加多个时间，例如早上出门前、中午吃饭前、晚上回家前。</p>
+          </div>
+
+          <div class="box">
+            <label class="title">天气变化提醒标准</label>
+            <ul class="standards">
+              <li>下雨：未来窗口内降雨概率 ≥ 45% 提醒带伞；≥ 70% 提醒一定带伞。</li>
+              <li>穿衣：体感 ≥ 30℃ 建议减衣/轻薄短袖；体感 ≤ 18℃ 建议添外套。</li>
+              <li>温差：当天最高最低温差 ≥ 9℃ 提醒分层穿，早晚加衣、中午减衣。</li>
+              <li>防晒：紫外线指数 ≥ 5 或最高温 ≥ 30℃ 提醒防晒/太阳镜。</li>
+              <li>大风：未来风速 ≥ 30 km/h 提醒骑车、打伞、帽子注意。</li>
+            </ul>
           </div>
 
           <div class="box">
@@ -227,6 +243,7 @@
         place: presets[0],
         leadTime: "180",
         schedules: ["07:30"],
+        locationDetail: "",
         timers: [],
         rules: { daily: true, rain: true, clothes: true, wind: true, sun: true },
         places: [],
@@ -236,12 +253,14 @@
 
       const $ = (id) => document.getElementById(id);
       let pushSubscription = null;
+      let activeRecognition = null;
 
       function save() {
         localStorage.setItem("weather-ping-netlify", JSON.stringify({
           place: state.place,
           leadTime: state.leadTime,
           schedules: state.schedules,
+          locationDetail: state.locationDetail,
           rules: state.rules
         }));
       }
@@ -258,14 +277,17 @@
             : parsed.dailyEnabled && parsed.dailyTime
               ? [parsed.dailyTime]
               : ["07:30"];
+          state.locationDetail = parsed.locationDetail || parsed.place?.detailName || "";
           state.rules = { ...state.rules, ...(parsed.rules || {}) };
           $("cityInput").value = state.place.name;
+          $("detailInput").value = state.locationDetail;
           $("scheduleTime").value = state.schedules[0] || "07:30";
         } catch {}
       }
 
       function formatPlace(place) {
-        return [place.name, place.admin1, place.country].filter(Boolean).join(" · ");
+        const base = [place.name, place.admin1, place.country].filter(Boolean).join(" · ");
+        return state.locationDetail ? `${state.locationDetail}（${base}）` : base;
       }
 
       function setMessage(text) {
@@ -327,7 +349,7 @@
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             subscription: pushSubscription,
-            place: state.place,
+            place: { ...state.place, detailName: state.locationDetail },
             schedules: state.schedules,
             rules: state.rules,
             itinerary: $("itineraryInput")?.value || "",
@@ -582,7 +604,7 @@
           return;
         }
         const nextList = state.schedules.map((time) => `${time} → ${formatNextTime(time)}`).join("；");
-        $("scheduleHint").textContent = "服务器后台推送：" + nextList + "。Netlify 每 15 分钟检查一次。";
+        $("scheduleHint").textContent = "服务器后台推送：" + nextList + "。系统每分钟检查一次，尽量按你设定的具体时间推送。";
       }
 
       function renderSchedules() {
@@ -812,7 +834,7 @@
         const response = await fetch("/api/test-push", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ subscription: sub, place: state.place })
+          body: JSON.stringify({ subscription: sub, place: { ...state.place, detailName: state.locationDetail } })
         });
         setMessage(response.ok ? "服务器测试推送已发送。" : "服务器测试推送失败，请检查 Netlify 环境变量。");
       };
@@ -829,7 +851,14 @@
         render();
         await syncServerSettings();
         scheduleAllReminders();
-        setMessage("已添加 " + time + " 的后台定时推送。服务器会每 15 分钟检查一次，到点主动推送。");
+        setMessage("已添加 " + time + " 的后台定时推送。服务器会按你设定的具体时间主动推送。");
+      };
+      $("saveDetailButton").onclick = async () => {
+        state.locationDetail = $("detailInput").value.trim();
+        save();
+        render();
+        await syncServerSettings();
+        setMessage(state.locationDetail ? "已保存详细位置：" + state.locationDetail : "已清除详细位置名称。");
       };
       $("analyzeTripButton").onclick = async () => {
         const itinerary = $("itineraryInput").value.trim();
@@ -840,7 +869,7 @@
         const response = await fetch("/api/analyze-trip", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ place: state.place, itinerary })
+          body: JSON.stringify({ place: { ...state.place, detailName: state.locationDetail }, itinerary })
         });
         const result = await response.json();
         $("itineraryResult").textContent = result.body || "分析失败，请稍后再试。";
@@ -856,7 +885,7 @@
         const response = await fetch("/api/analyze-trip", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ place: state.place, itinerary })
+          body: JSON.stringify({ place: { ...state.place, detailName: state.locationDetail }, itinerary })
         });
         const result = await response.json();
         $("itineraryResult").textContent = result.body || "分析失败，请稍后再试。";
@@ -864,16 +893,25 @@
         await sendNotification("行程天气建议", result.body || "你的行程天气建议已生成。", "weather-ping-trip-local");
       };
       $("voiceButton").onclick = () => {
+        if (activeRecognition) {
+          activeRecognition.stop();
+          activeRecognition = null;
+          $("voiceButton").textContent = "语音输入";
+          setMessage("已停止语音输入。");
+          return;
+        }
         const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!Recognition) {
           setMessage("当前浏览器不支持语音输入。Android Chrome 通常支持，iPhone Safari 可能不可用。");
           return;
         }
         const recognition = new Recognition();
+        activeRecognition = recognition;
         recognition.lang = "zh-CN";
         recognition.interimResults = false;
         recognition.maxAlternatives = 1;
         setMessage("正在听你说行程…");
+        $("voiceButton").textContent = "停止语音";
         recognition.onresult = (event) => {
           const text = event.results?.[0]?.[0]?.transcript || "";
           $("itineraryInput").value = $("itineraryInput").value
@@ -881,7 +919,15 @@
             : text;
           setMessage("语音输入完成，可以点“分析行程建议”。");
         };
-        recognition.onerror = () => setMessage("语音输入失败，可以改用文字输入。");
+        recognition.onend = () => {
+          activeRecognition = null;
+          $("voiceButton").textContent = "语音输入";
+        };
+        recognition.onerror = () => {
+          activeRecognition = null;
+          $("voiceButton").textContent = "语音输入";
+          setMessage("语音输入失败，可以改用文字输入。");
+        };
         recognition.start();
       };
       $("cityInput").addEventListener("keydown", (event) => {

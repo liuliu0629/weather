@@ -1,10 +1,12 @@
 import {
+  chinaDateKey,
   deleteClient,
   fetchWeather,
   listClients,
   makeDetailedAdvice,
   scheduleDue,
-  setupWebPush
+  setupWebPush,
+  writeClient
 } from "./lib.mjs";
 
 export default async function handler() {
@@ -15,8 +17,10 @@ export default async function handler() {
   for (const client of clients) {
     try {
       const schedules = Array.isArray(client.schedules) ? client.schedules : [];
-      const due = schedules.some((time) => scheduleDue(time, 7));
-      if (!due || !client.subscription?.endpoint || !client.place) continue;
+      const today = chinaDateKey();
+      const sent = client.lastSentBySchedule || {};
+      const dueTimes = schedules.filter((time) => scheduleDue(time, 0) && sent[time] !== today);
+      if (!dueTimes.length || !client.subscription?.endpoint || !client.place) continue;
 
       const weather = await fetchWeather(client.place);
       const advice = makeDetailedAdvice(client.place, weather, 6);
@@ -25,6 +29,8 @@ export default async function handler() {
         JSON.stringify({ title: advice.title, body: advice.body, url: "/" }),
         { TTL: 60 * 60, urgency: "high", topic: "weather-ping" }
       );
+      for (const time of dueTimes) sent[time] = today;
+      await writeClient(client.id, { ...client, lastSentBySchedule: sent });
       results.push({ id: client.id, ok: true });
     } catch (error) {
       const statusCode = error?.statusCode;
@@ -43,5 +49,5 @@ export default async function handler() {
 }
 
 export const config = {
-  schedule: "*/15 * * * *"
+  schedule: "* * * * *"
 };

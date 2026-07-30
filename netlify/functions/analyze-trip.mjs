@@ -1,4 +1,4 @@
-import { fetchWeather, formatHourLabel, json, makeDetailedAdvice, weatherLabels } from "./lib.mjs";
+import { displayPlaceName, fetchWeather, formatHourLabel, json, makeDetailedAdvice, weatherLabels } from "./lib.mjs";
 
 function parseItinerary(text) {
   const pattern = /(上午|下午|晚上|中午|早上|明天)?\s*(\d{1,2})(?:[:：点时](\d{1,2})?)?/g;
@@ -68,5 +68,5 @@ export default async function handler(request) {
   const lines = items.length
     ? items.map((item) => adviceForTripItem(weather, item, tomorrow, body.itinerary))
     : [fallback.body];
-  return json({ ok: true, title: "行程天气建议", body: lines.join("\n"), lines });
+  return json({ ok: true, title: `${displayPlaceName(body.place)} 行程天气建议`, body: lines.join("\n"), lines });
 }
