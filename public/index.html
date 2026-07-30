@@ -77,6 +77,12 @@
       .ghost { background: white; color: #475569; box-shadow: 0 6px 18px rgba(15,23,42,.07); }
       .chips, .schedule-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 11px; }
       .chip, .schedule-chip { border-radius: 999px; padding: 9px 12px; background: white; color: #475569; font-size: 12px; font-weight: 900; box-shadow: 0 6px 18px rgba(15,23,42,.07); }
+      .place-results { display: grid; gap: 9px; margin-top: 12px; }
+      .place-option { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; border-radius: 20px; padding: 12px 14px; background: white; color: #334155; text-align: left; box-shadow: 0 6px 18px rgba(15,23,42,.07); }
+      .place-option strong { display: block; color: #1d4ed8; font-size: 15px; }
+      .place-option span { display: block; margin-top: 4px; color: #64748b; font-size: 12px; line-height: 1.35; }
+      .toast { position: fixed; left: 50%; bottom: 28px; z-index: 20; transform: translateX(-50%) translateY(20px); opacity: 0; pointer-events: none; border-radius: 999px; padding: 12px 18px; background: #0f172a; color: white; font-size: 14px; font-weight: 900; box-shadow: 0 18px 40px rgba(15,23,42,.24); transition: .22s ease; }
+      .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
       .schedule-chip { display: inline-flex; align-items: center; gap: 8px; background: #eff6ff; color: #1d4ed8; }
       .schedule-chip button { width: 22px; height: 22px; border-radius: 999px; padding: 0; background: #dbeafe; color: #1e40af; font-weight: 1000; }
       .segments { display: flex; gap: 8px; }
@@ -150,16 +156,13 @@
           </div>
 
           <div class="box">
-            <label class="title" for="cityInput">搜索城市 / 使用定位</label>
+            <label class="title" for="cityInput">搜索地点 / 使用定位</label>
             <div class="search">
-              <input id="cityInput" type="text" value="上海" placeholder="例如：上海、杭州、深圳" />
+              <input id="cityInput" type="text" value="上海" placeholder="输入地点：北京理工大学空天 / XX院 3号楼 / 邯郸市" />
               <button class="dark" id="searchButton">搜索</button>
             </div>
-            <div class="search" style="margin-top: 8px;">
-              <input id="detailInput" type="text" placeholder="详细位置名称：例如 XX院 3号楼 / 公司 A座" />
-              <button class="ghost" id="saveDetailButton">保存位置名</button>
-            </div>
             <div class="chips" id="chips"></div>
+            <div class="place-results" id="placeResults"></div>
           </div>
 
           <div class="box">
@@ -218,6 +221,7 @@
         </article>
       </section>
     </main>
+    <div class="toast" id="toast"></div>
 
     <script>
       const presets = [
@@ -253,6 +257,7 @@
         timers: [],
         rules: { daily: true, rain: true, clothes: true, wind: true, sun: true },
         places: [],
+        placeResults: [],
         weather: null,
         lastAlertKey: ""
       };
@@ -285,8 +290,7 @@
               : ["07:30"];
           state.locationDetail = parsed.locationDetail || parsed.place?.detailName || "";
           state.rules = { ...state.rules, ...(parsed.rules || {}) };
-          $("cityInput").value = state.place.name;
-          $("detailInput").value = state.locationDetail;
+          $("cityInput").value = state.locationDetail || state.place.name;
           $("scheduleTime").value = state.schedules[0] || "07:30";
         } catch {}
       }
@@ -324,6 +328,14 @@
 
       function setMessage(text) {
         $("message").textContent = text;
+      }
+
+      function showToast(text) {
+        const toast = $("toast");
+        toast.textContent = text;
+        toast.classList.add("show");
+        window.clearTimeout(showToast.timer);
+        showToast.timer = window.setTimeout(() => toast.classList.remove("show"), 2200);
       }
 
       function updatePermissionLabel() {
@@ -664,6 +676,47 @@
         });
       }
 
+      function choosePlace(place) {
+        state.place = {
+          name: place.name || "我的位置",
+          admin1: place.admin1 || "",
+          country: place.country || "",
+          latitude: place.latitude,
+          longitude: place.longitude,
+          detailName: place.detailName || ""
+        };
+        state.locationDetail = place.detailName || place.poiName || place.formattedAddress || place.name || "";
+        state.placeResults = [];
+        state.places = [];
+        $("cityInput").value = state.locationDetail || state.place.name;
+        save();
+        render();
+        syncServerSettings();
+        refreshWeather();
+        showToast("位置已保存");
+        setMessage("已保存位置：" + (state.locationDetail || formatPlaceBase(state.place)));
+      }
+
+      function renderPlaceResults() {
+        const container = $("placeResults");
+        container.innerHTML = "";
+        state.placeResults.forEach((place) => {
+          const row = document.createElement("button");
+          row.className = "place-option";
+          const content = document.createElement("span");
+          const title = document.createElement("strong");
+          const subtitle = document.createElement("span");
+          const action = document.createElement("b");
+          title.textContent = place.poiName || place.detailName || place.name;
+          subtitle.textContent = place.formattedAddress || formatPlaceBase(place);
+          action.textContent = "选择";
+          content.append(title, subtitle);
+          row.append(content, action);
+          row.onclick = () => choosePlace(place);
+          container.appendChild(row);
+        });
+      }
+
       function render() {
         $("placeLabel").textContent = state.locationDetail || state.place.name || "当前位置";
         $("placeBaseLabel").textContent = state.locationDetail ? formatPlaceBase(state.place) : "";
@@ -676,21 +729,7 @@
         locationButton.textContent = "使用当前位置";
         locationButton.onclick = useCurrentLocation;
         $("chips").appendChild(locationButton);
-        [...presets, ...state.places].forEach((place) => {
-          const button = document.createElement("button");
-          button.className = "chip";
-          button.textContent = formatPlaceBase(place);
-          button.onclick = () => {
-            state.place = place;
-            $("cityInput").value = place.name;
-            state.places = [];
-            save();
-            render();
-            syncServerSettings();
-            refreshWeather();
-          };
-          $("chips").appendChild(button);
-        });
+        renderPlaceResults();
 
         $("leadButtons").innerHTML = "";
         [["30", "30 分钟"], ["60", "1 小时"], ["180", "3 小时"], ["360", "6 小时"]].forEach(([value, label]) => {
@@ -788,24 +827,23 @@
       async function searchCity() {
         const query = $("cityInput").value.trim();
         if (!query) return;
-        setMessage("正在搜索城市…");
+        setMessage("正在搜索位置…");
         try {
-          const params = new URLSearchParams({ name: query, count: "5", language: "zh", format: "json" });
-          const response = await fetch("https://geocoding-api.open-meteo.com/v1/search?" + params);
+          const params = new URLSearchParams({ keyword: query, city: state.place.name || "" });
+          const response = await fetch("/api/search-place?" + params);
           const data = await response.json();
           const results = data.results || [];
-          state.places = results;
+          state.placeResults = results;
+          state.places = [];
           if (results[0]) {
-            state.place = results[0];
-            save();
+            setMessage("请选择一个位置。");
             render();
-            await syncServerSettings();
-            refreshWeather();
           } else {
-            setMessage("没有搜到这个城市，可以换个名字试试。");
+            setMessage("没有搜到这个位置，可以换个关键词试试。");
+            render();
           }
         } catch {
-          setMessage("城市搜索失败，请稍后再试。");
+          setMessage("位置搜索失败，请稍后再试。");
         }
       }
 
@@ -842,8 +880,8 @@
             state.place = await reverseGeocode(latitude, longitude);
             state.locationDetail = state.place.detailName || state.locationDetail;
             state.places = [];
-            $("cityInput").value = state.place.name;
-            $("detailInput").value = state.locationDetail;
+            state.placeResults = [];
+            $("cityInput").value = state.locationDetail || state.place.name;
             save();
             render();
             await syncServerSettings();
@@ -889,14 +927,8 @@
         render();
         await syncServerSettings();
         scheduleAllReminders();
+        showToast("推送时间已添加");
         setMessage("已添加 " + time + " 的后台定时推送。服务器会按你设定的具体时间主动推送。");
-      };
-      $("saveDetailButton").onclick = async () => {
-        state.locationDetail = $("detailInput").value.trim();
-        save();
-        render();
-        await syncServerSettings();
-        setMessage(state.locationDetail ? "已保存详细位置：" + state.locationDetail : "已清除详细位置名称。");
       };
       $("saveLeadButton").onclick = async () => {
         const minutes = parseLeadInput($("customLeadInput").value);
@@ -909,6 +941,7 @@
         render();
         await syncServerSettings();
         if (state.weather) evaluateWeather(state.weather, false);
+        showToast("提醒时间已保存");
         setMessage("已保存天气变化提前提醒时间：" + displayLead(state.leadTime));
       };
       $("analyzeTripButton").onclick = async () => {
