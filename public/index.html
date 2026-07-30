@@ -1,0 +1,900 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#2563eb" />
+    <meta name="description" content="定时推送具体出门天气建议的手机 PWA。" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <title>Weather Ping 天气提醒</title>
+    <style>
+      :root {
+        --bg: #eef6ff;
+        --ink: #07111f;
+        --muted: #64748b;
+        --blue: #2563eb;
+        --deep: #0f172a;
+        --card: rgba(255, 255, 255, 0.88);
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at 12% 8%, rgba(125, 211, 252, 0.55), transparent 28rem),
+          radial-gradient(circle at 92% 16%, rgba(129, 140, 248, 0.32), transparent 24rem),
+          var(--bg);
+        color: var(--ink);
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+      button, input { font: inherit; }
+      button { border: 0; cursor: pointer; touch-action: manipulation; }
+
+      .shell { width: min(1120px, 100%); min-height: 100vh; margin: 0 auto; padding: 24px 20px 34px; }
+      .nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+      .eyebrow { margin: 0 0 4px; color: #0369a1; font-size: 14px; font-weight: 800; }
+      h1 { margin: 0; font-size: clamp(27px, 5vw, 46px); line-height: 1.05; letter-spacing: -0.05em; }
+      .pill { display: inline-flex; border-radius: 999px; padding: 9px 14px; background: rgba(255,255,255,.82); box-shadow: 0 10px 30px rgba(15,23,42,.08); font-size: 13px; font-weight: 900; white-space: nowrap; }
+      .grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 24px; align-items: center; padding-top: 34px; }
+
+      .hero {
+        position: relative; overflow: hidden; border-radius: 36px; padding: 28px; color: white;
+        background: linear-gradient(135deg, #38bdf8 0%, #2563eb 48%, #3730a3 100%);
+        box-shadow: 0 24px 70px rgba(37,99,235,.32);
+      }
+      .hero::after { content: ""; position: absolute; top: 28px; right: 28px; width: 120px; height: 120px; border-radius: 999px; background: rgba(255,255,255,.22); filter: blur(2px); }
+      .hero-content { position: relative; z-index: 1; }
+      .hero-top, .panel-top { display: flex; justify-content: space-between; gap: 16px; }
+      .small { margin: 0; color: rgba(255,255,255,.74); font-size: 13px; }
+      .place { margin: 4px 0 0; font-size: 25px; font-weight: 1000; }
+      .now { border-radius: 22px; padding: 12px 16px; background: rgba(255,255,255,.15); text-align: right; backdrop-filter: blur(12px); }
+      .temp { margin: 2px 0 0; font-size: 29px; font-weight: 1000; }
+      .weather-name { margin: 60px 0 0; font-size: clamp(56px, 9vw, 86px); font-weight: 1000; line-height: .95; letter-spacing: -0.08em; }
+      .summary { max-width: 560px; margin: 20px 0 0; color: rgba(255,255,255,.88); font-size: 18px; line-height: 1.65; }
+      .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 38px; }
+      .stat { border-radius: 24px; padding: 16px; background: rgba(255,255,255,.14); backdrop-filter: blur(12px); }
+      .stat span { display: block; color: rgba(255,255,255,.68); font-size: 12px; }
+      .stat strong { display: block; margin-top: 5px; font-size: 20px; }
+
+      .panel { border-radius: 32px; padding: 24px; background: var(--card); box-shadow: 0 22px 60px rgba(15,23,42,.12); backdrop-filter: blur(18px); }
+      h2 { margin: 0; font-size: 22px; letter-spacing: -0.04em; }
+      .panel-sub { margin: 5px 0 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
+      .status { border-radius: 999px; padding: 6px 11px; background: #ecfdf5; color: #047857; font-size: 12px; font-weight: 900; white-space: nowrap; }
+      .box { margin-top: 16px; border-radius: 26px; padding: 16px; background: #f8fafc; }
+      label.title { display: block; margin-bottom: 10px; color: #334155; font-size: 14px; font-weight: 900; }
+      .search, .schedule-row { display: flex; gap: 8px; }
+      input[type="text"], input[type="time"], textarea { min-width: 0; flex: 1; border: 1px solid #e2e8f0; border-radius: 18px; padding: 13px 15px; background: white; color: #0f172a; outline: none; }
+      textarea { width: 100%; min-height: 92px; resize: vertical; line-height: 1.55; }
+      input:focus { border-color: #60a5fa; box-shadow: 0 0 0 4px rgba(96,165,250,.18); }
+      .primary, .dark, .warm, .ghost { border-radius: 18px; padding: 13px 15px; font-size: 14px; font-weight: 1000; }
+      .primary { background: var(--blue); color: white; box-shadow: 0 12px 24px rgba(37,99,235,.22); }
+      .dark { background: var(--deep); color: white; }
+      .warm { background: #fbbf24; color: #111827; }
+      .ghost { background: white; color: #475569; box-shadow: 0 6px 18px rgba(15,23,42,.07); }
+      .chips, .schedule-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 11px; }
+      .chip, .schedule-chip { border-radius: 999px; padding: 9px 12px; background: white; color: #475569; font-size: 12px; font-weight: 900; box-shadow: 0 6px 18px rgba(15,23,42,.07); }
+      .schedule-chip { display: inline-flex; align-items: center; gap: 8px; background: #eff6ff; color: #1d4ed8; }
+      .schedule-chip button { width: 22px; height: 22px; border-radius: 999px; padding: 0; background: #dbeafe; color: #1e40af; font-weight: 1000; }
+      .segments { display: flex; gap: 8px; }
+      .segment { flex: 1; border-radius: 18px; padding: 13px 8px; background: white; color: #475569; font-size: 14px; font-weight: 1000; }
+      .segment.active { background: var(--blue); color: white; }
+      .rules { margin-top: 14px; display: grid; gap: 10px; }
+      .rule { display: flex; align-items: center; gap: 14px; border: 1px solid #f1f5f9; border-radius: 24px; padding: 14px; background: white; box-shadow: 0 8px 22px rgba(15,23,42,.05); }
+      .rule input { width: 20px; height: 20px; accent-color: var(--blue); }
+      .rule-main { flex: 1; }
+      .rule-title { display: block; font-weight: 1000; }
+      .rule-detail { display: block; margin-top: 3px; color: var(--muted); font-size: 13px; line-height: 1.4; }
+      .badge { border-radius: 999px; padding: 6px 10px; background: #eff6ff; color: #1d4ed8; font-size: 12px; font-weight: 900; }
+      .actions { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-top: 16px; }
+      .message { margin: 14px 0 0; border-radius: 20px; padding: 13px 15px; background: #f1f5f9; color: #475569; font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
+      .itinerary-result { margin-top: 10px; border-radius: 20px; padding: 13px 15px; background: #ecfeff; color: #155e75; font-size: 14px; line-height: 1.65; white-space: pre-wrap; }
+      .note { margin: 10px 0 0; color: #94a3b8; font-size: 12px; line-height: 1.55; }
+
+      @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+      @media (max-width: 560px) {
+        .shell { padding: 18px 14px 28px; }
+        .nav { align-items: flex-start; }
+        .hero, .panel { border-radius: 28px; padding: 18px; }
+        .weather-name { margin-top: 50px; }
+        .stats, .actions { grid-template-columns: 1fr; }
+        .search, .schedule-row { flex-direction: column; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <nav class="nav">
+        <div>
+          <p class="eyebrow">Weather Ping Live</p>
+          <h1>具体到能出门的天气提醒</h1>
+        </div>
+        <span class="pill">Netlify PWA</span>
+      </nav>
+
+      <section class="grid">
+        <article class="hero">
+          <div class="hero-content">
+            <div class="hero-top">
+              <div>
+                <p class="small">当前位置</p>
+                <p class="place" id="placeLabel">上海 · 上海 · 中国</p>
+              </div>
+              <div class="now">
+                <p class="small">现在</p>
+                <p class="temp" id="temperature">--℃</p>
+              </div>
+            </div>
+            <p class="weather-name" id="weatherName">加载中</p>
+            <p class="summary" id="summary">正在读取真实天气，并生成出门建议。</p>
+            <div class="stats">
+              <div class="stat"><span>提醒窗口</span><strong id="leadStat">3 小时</strong></div>
+              <div class="stat"><span>最高降雨</span><strong id="rainStat">--%</strong></div>
+              <div class="stat"><span>最高风速</span><strong id="windStat">-- km/h</strong></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-top">
+            <div>
+              <h2>天气出门管家</h2>
+              <p class="panel-sub">通知会告诉你是否下雨、是否带伞、穿什么、是否加衣/减衣，以及防晒和大风建议。</p>
+            </div>
+            <span class="status" id="permissionStatus">待授权</span>
+          </div>
+
+          <div class="box">
+            <label class="title" for="cityInput">搜索城市 / 使用定位</label>
+            <div class="search">
+              <input id="cityInput" type="text" value="上海" placeholder="例如：上海、杭州、深圳" />
+              <button class="dark" id="searchButton">搜索</button>
+            </div>
+            <div class="chips" id="chips"></div>
+          </div>
+
+          <div class="box">
+            <label class="title">天气变化前多久提醒</label>
+            <div class="segments" id="leadButtons"></div>
+          </div>
+
+          <div class="box">
+            <label class="title" for="scheduleTime">添加定时推送时间</label>
+            <div class="schedule-row">
+              <input id="scheduleTime" type="time" value="07:30" />
+              <button class="primary" id="addScheduleButton">添加</button>
+            </div>
+            <div class="schedule-list" id="scheduleList"></div>
+            <p class="note" id="scheduleHint">可以添加多个时间，例如早上出门前、中午吃饭前、晚上回家前。</p>
+          </div>
+
+          <div class="box">
+            <label class="title" for="itineraryInput">告诉我你的行程</label>
+            <textarea id="itineraryInput" placeholder="例如：明天 8:20 骑车去地铁站，9:00 到公司，12:30 出去吃饭，18:20 下班回家。"></textarea>
+            <div class="actions">
+              <button class="primary" id="analyzeTripButton">分析行程建议</button>
+              <button class="dark" id="voiceButton">语音输入</button>
+              <button class="warm" id="tripPushButton">推送行程建议</button>
+            </div>
+            <p class="itinerary-result" id="itineraryResult">输入行程后，我会按时间段告诉你哪里可能遇到雨、是否带伞、穿什么、要不要防晒或加衣。</p>
+          </div>
+
+          <div class="rules" id="rules"></div>
+
+          <div class="actions">
+            <button class="primary" id="permissionButton">开启手机通知</button>
+            <button class="dark" id="refreshButton">立即检查天气</button>
+            <button class="warm" id="testButton">测试详细推送</button>
+          </div>
+
+          <p class="message" id="message">正在准备真实天气提醒…</p>
+          <p class="note">
+            说明：Netlify 拖拽静态版会在 PWA 打开、前台或被系统保留时按点提醒。若要 App 完全关闭后也 100% 到点推送，需要下一版加后端定时任务和 Web Push 订阅存储。
+          </p>
+        </article>
+      </section>
+    </main>
+
+    <script>
+      const presets = [
+        { name: "上海", admin1: "上海", country: "中国", latitude: 31.2304, longitude: 121.4737 },
+        { name: "北京", admin1: "北京", country: "中国", latitude: 39.9042, longitude: 116.4074 },
+        { name: "广州", admin1: "广东", country: "中国", latitude: 23.1291, longitude: 113.2644 },
+        { name: "深圳", admin1: "广东", country: "中国", latitude: 22.5431, longitude: 114.0579 },
+        { name: "杭州", admin1: "浙江", country: "中国", latitude: 30.2741, longitude: 120.1551 }
+      ];
+
+      const weatherLabels = {
+        0: "晴朗", 1: "大部晴朗", 2: "局部多云", 3: "阴天",
+        45: "有雾", 48: "霜雾", 51: "小毛毛雨", 53: "毛毛雨", 55: "较强毛毛雨",
+        56: "冻毛毛雨", 57: "强冻毛毛雨", 61: "小雨", 63: "中雨", 65: "大雨",
+        66: "冻雨", 67: "强冻雨", 71: "小雪", 73: "中雪", 75: "大雪",
+        77: "米雪", 80: "阵雨", 81: "较强阵雨", 82: "强阵雨",
+        85: "阵雪", 86: "强阵雪", 95: "雷暴", 96: "雷暴伴冰雹", 99: "强雷暴伴冰雹"
+      };
+
+      const ruleCopy = {
+        daily: ["定时出门建议", "到点推送完整出门建议：雨伞、穿衣、防晒、风和温差。", "定时"],
+        rain: ["下雨 / 带伞提醒", "未来几小时降雨概率高时，说明是否需要带伞。", "雨伞"],
+        clothes: ["添衣 / 减衣提醒", "根据体感温度、最高最低温和温差给穿衣建议。", "穿衣"],
+        wind: ["大风提醒", "风大时提醒骑车、打伞和户外活动注意。", "大风"],
+        sun: ["防晒提醒", "紫外线较强或晴热时提醒防晒、太阳镜。", "防晒"]
+      };
+
+      const state = {
+        place: presets[0],
+        leadTime: "180",
+        schedules: ["07:30"],
+        timers: [],
+        rules: { daily: true, rain: true, clothes: true, wind: true, sun: true },
+        places: [],
+        weather: null,
+        lastAlertKey: ""
+      };
+
+      const $ = (id) => document.getElementById(id);
+      let pushSubscription = null;
+
+      function save() {
+        localStorage.setItem("weather-ping-netlify", JSON.stringify({
+          place: state.place,
+          leadTime: state.leadTime,
+          schedules: state.schedules,
+          rules: state.rules
+        }));
+      }
+
+      function load() {
+        const saved = localStorage.getItem("weather-ping-netlify");
+        if (!saved) return;
+        try {
+          const parsed = JSON.parse(saved);
+          state.place = parsed.place || presets[0];
+          state.leadTime = parsed.leadTime || "180";
+          state.schedules = Array.isArray(parsed.schedules)
+            ? parsed.schedules
+            : parsed.dailyEnabled && parsed.dailyTime
+              ? [parsed.dailyTime]
+              : ["07:30"];
+          state.rules = { ...state.rules, ...(parsed.rules || {}) };
+          $("cityInput").value = state.place.name;
+          $("scheduleTime").value = state.schedules[0] || "07:30";
+        } catch {}
+      }
+
+      function formatPlace(place) {
+        return [place.name, place.admin1, place.country].filter(Boolean).join(" · ");
+      }
+
+      function setMessage(text) {
+        $("message").textContent = text;
+      }
+
+      function updatePermissionLabel() {
+        if (!("Notification" in window)) {
+          $("permissionStatus").textContent = "不支持通知";
+          return;
+        }
+        $("permissionStatus").textContent =
+          Notification.permission === "granted" ? "通知已开" :
+          Notification.permission === "denied" ? "通知被拒绝" : "待授权";
+      }
+
+      function urlBase64ToUint8Array(base64String) {
+        const padding = "=".repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+        const rawData = window.atob(base64);
+        return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
+      }
+
+      async function getServerPushSubscription() {
+        if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+          setMessage("当前浏览器不支持服务器后台推送。");
+          return null;
+        }
+        const permission = Notification.permission === "granted"
+          ? "granted"
+          : await Notification.requestPermission();
+        updatePermissionLabel();
+        if (permission !== "granted") return null;
+
+        const config = await fetch("/api/config").then((res) => res.json());
+        if (!config.vapidPublicKey) {
+          setMessage("服务器还没有配置 VAPID_PUBLIC_KEY，无法开启真正后台推送。");
+          return null;
+        }
+        const registration = await navigator.serviceWorker.ready;
+        pushSubscription = await registration.pushManager.getSubscription();
+        if (!pushSubscription) {
+          pushSubscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(config.vapidPublicKey)
+          });
+        }
+        return pushSubscription;
+      }
+
+      async function syncServerSettings() {
+        if (!pushSubscription) {
+          const existing = "serviceWorker" in navigator ? await (await navigator.serviceWorker.ready).pushManager.getSubscription() : null;
+          pushSubscription = existing;
+        }
+        if (!pushSubscription) return false;
+        const response = await fetch("/api/subscribe", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            subscription: pushSubscription,
+            place: state.place,
+            schedules: state.schedules,
+            rules: state.rules,
+            itinerary: $("itineraryInput")?.value || "",
+            createdAt: new Date().toISOString()
+          })
+        });
+        return response.ok;
+      }
+
+      function formatChineseDate(date = new Date()) {
+        return (date.getMonth() + 1) + "月" + date.getDate() + "日";
+      }
+
+      function formatHourLabel(time) {
+        return new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      }
+
+      function getDelayToTime(timeText) {
+        const [hour, minute] = timeText.split(":").map(Number);
+        const now = new Date();
+        const next = new Date();
+        next.setHours(hour || 7, minute || 0, 0, 0);
+        if (next <= now) next.setDate(next.getDate() + 1);
+        return next.getTime() - now.getTime();
+      }
+
+      function formatNextTime(timeText) {
+        const next = new Date(Date.now() + getDelayToTime(timeText));
+        return next.toLocaleString([], { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+      }
+
+      function upcomingHours(weather, hourWindow = Number(state.leadTime) / 60) {
+        const now = Date.now();
+        const max = now + hourWindow * 60 * 60 * 1000;
+        return weather.hourly.time.map((time, index) => ({
+          time,
+          stamp: new Date(time).getTime(),
+          rain: weather.hourly.precipitation_probability[index] ?? 0,
+          temp: weather.hourly.temperature_2m[index] ?? weather.current.temperature_2m,
+          apparent: weather.hourly.apparent_temperature?.[index] ?? weather.current.apparent_temperature ?? weather.current.temperature_2m,
+          wind: weather.hourly.wind_speed_10m[index] ?? weather.current.wind_speed_10m,
+          humidity: weather.hourly.relative_humidity_2m?.[index] ?? weather.current.relative_humidity_2m ?? 0,
+          code: weather.hourly.weather_code[index] ?? weather.current.weather_code
+        })).filter((item) => item.stamp >= now && item.stamp <= max).slice(0, 24);
+      }
+
+      function upcomingRainSlots(weather, hourWindow = Number(state.leadTime) / 60) {
+        const source = weather.minutely_15;
+        if (!source?.time?.length) return [];
+        const now = Date.now();
+        const max = now + hourWindow * 60 * 60 * 1000;
+        return source.time.map((time, index) => ({
+          time,
+          stamp: new Date(time).getTime(),
+          rain: source.precipitation_probability?.[index] ?? 0,
+          precipitation: source.precipitation?.[index] ?? 0,
+          code: source.weather_code?.[index] ?? 0
+        })).filter((item) => item.stamp >= now && item.stamp <= max);
+      }
+
+      function rainAdvice(hours) {
+        const maxRain = Math.max(0, ...hours.map((item) => item.rain));
+        const firstRain = hours.find((item) => item.rain >= 45 || [51,53,55,61,63,65,80,81,82,95,96,99].includes(item.code));
+        if (maxRain >= 70) return { level: "high", text: `大概率下雨${firstRain ? "，约 " + formatHourLabel(firstRain.time) + " 开始风险升高" : ""}，建议一定带伞。`, maxRain };
+        if (maxRain >= 45) return { level: "mid", text: `可能下雨，最高降雨概率 ${maxRain}%，建议带一把轻便伞。`, maxRain };
+        if (maxRain >= 25) return { level: "low", text: `有一点降雨可能，最高 ${maxRain}%，长时间在外可备伞。`, maxRain };
+        return { level: "none", text: `基本不下雨，最高降雨概率 ${maxRain}%，通常不用带伞。`, maxRain };
+      }
+
+      function preciseRainAdvice(weather) {
+        const slots = upcomingRainSlots(weather, Math.max(6, Number(state.leadTime) / 60));
+        if (!slots.length) return null;
+        const rainy = slots.filter((item) => item.rain >= 45 || item.precipitation > 0 || [51,53,55,61,63,65,80,81,82,95,96,99].includes(item.code));
+        if (!rainy.length) return null;
+        const first = rainy[0];
+        const peak = rainy.reduce((best, item) => item.rain > best.rain ? item : best, rainy[0]);
+        const last = rainy[rainy.length - 1];
+        const start = formatHourLabel(first.time);
+        const end = formatHourLabel(last.time);
+        const peakTime = formatHourLabel(peak.time);
+        if (start === end) return `预计 ${start} 左右有雨，最高概率约 ${peak.rain}%。`;
+        return `预计 ${start} 到 ${end} 有雨，${peakTime} 左右概率最高（约 ${peak.rain}%）。`;
+      }
+
+      function clothesAdvice(weather, hours) {
+        const current = Math.round(weather.current.temperature_2m);
+        const apparent = Math.round(weather.current.apparent_temperature ?? weather.current.temperature_2m);
+        const dayMax = Math.round(weather.daily?.temperature_2m_max?.[0] ?? Math.max(...hours.map((item) => item.temp)));
+        const dayMin = Math.round(weather.daily?.temperature_2m_min?.[0] ?? Math.min(...hours.map((item) => item.temp)));
+        const diff = dayMax - dayMin;
+        let wear = "";
+        if (apparent >= 33) wear = "体感很热，建议短袖短裤、透气鞋，尽量少穿深色厚衣服";
+        else if (apparent >= 28) wear = "体感偏热，建议轻薄短袖、短裤或薄长裤";
+        else if (apparent >= 23) wear = "体感舒适偏暖，短袖或薄长袖都可以";
+        else if (apparent >= 17) wear = "早晚可能凉，建议长袖或带一件薄外套";
+        else if (apparent >= 10) wear = "偏凉，建议外套、长裤";
+        else wear = "较冷，建议厚外套和保暖内搭";
+
+        const change = diff >= 9 ? `昼夜温差约 ${diff}℃，建议分层穿，早晚加衣、中午可减衣。` :
+          apparent >= 30 ? "今天偏热，不建议添衣，出汗后注意补水。" :
+          apparent <= 18 ? "体感偏凉，建议添一件外套。" :
+          "温差不大，正常穿着即可。";
+        return { text: `${wear}。${change}`, current, apparent, dayMax, dayMin, diff };
+      }
+
+      function windAdvice(hours) {
+        const maxWind = Math.round(Math.max(0, ...hours.map((item) => item.wind)));
+        if (maxWind >= 39) return { text: `风很大，最高约 ${maxWind} km/h，骑车和打伞都要小心。`, maxWind };
+        if (maxWind >= 30) return { text: `风偏大，最高约 ${maxWind} km/h，建议固定帽子，伞选结实一点。`, maxWind };
+        return { text: `风不大，最高约 ${maxWind} km/h。`, maxWind };
+      }
+
+      function sunAdvice(weather) {
+        const uv = Math.round(weather.daily?.uv_index_max?.[0] ?? 0);
+        const maxTemp = Math.round(weather.daily?.temperature_2m_max?.[0] ?? weather.current.temperature_2m);
+        if (uv >= 8) return { text: `紫外线很强，建议防晒霜、太阳镜、帽子，尽量避开正午暴晒。`, uv };
+        if (uv >= 5 || maxTemp >= 30) return { text: `紫外线/日晒偏强，建议防晒和太阳镜。`, uv };
+        return { text: `日晒压力不高，普通防护即可。`, uv };
+      }
+
+      function comfortAdvice(weather, hours) {
+        const humidity = Math.round(weather.current.relative_humidity_2m ?? Math.max(0, ...hours.map((item) => item.humidity)));
+        const apparent = Math.round(weather.current.apparent_temperature ?? weather.current.temperature_2m);
+        if (apparent >= 30 && humidity >= 70) return `体感闷热，湿度约 ${humidity}%，建议带水，通勤别走太急。`;
+        if (humidity >= 85) return `湿度较高，约 ${humidity}%，衣物可以选速干、透气材质。`;
+        return `体感 ${apparent}℃，湿度约 ${humidity}%。`;
+      }
+
+      function makeDetailedAdvice(weather) {
+        const hours = upcomingHours(weather, Math.max(6, Number(state.leadTime) / 60));
+        const name = weatherLabels[weather.current.weather_code] || "天气变化";
+        const rain = rainAdvice(hours);
+        const preciseRain = preciseRainAdvice(weather);
+        const clothes = clothesAdvice(weather, hours);
+        const wind = windAdvice(hours);
+        const sun = sunAdvice(weather);
+        const comfort = comfortAdvice(weather, hours);
+        const title = "明早出门建议";
+        const rainText = preciseRain ? `${preciseRain} ${rain.text}` : rain.text;
+        const body = `${state.place.name} ${formatChineseDate()}天气早报：${name}，${comfort} ${rainText} ${clothes.text} ${sun.text} ${wind.text}`;
+        const short = `${name}，体感 ${clothes.apparent}℃。${rainText} ${clothes.text}`;
+        return { title, body, short, rain, preciseRain, rainText, clothes, wind, sun };
+      }
+
+      function parseItinerary(text) {
+        const pattern = /(上午|下午|晚上|中午|早上|明天)?\s*(\d{1,2})(?:[:：点时](\d{1,2})?)?/g;
+        const items = [];
+        let match;
+        while ((match = pattern.exec(text)) !== null) {
+          let hour = Number(match[2]);
+          const minute = Number(match[3] || 0);
+          const prefix = match[1] || "";
+          if ((prefix === "下午" || prefix === "晚上") && hour < 12) hour += 12;
+          if (prefix === "中午" && hour < 11) hour += 12;
+          if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) {
+            const around = text.slice(Math.max(0, match.index - 12), Math.min(text.length, match.index + 28)).replace(/\s+/g, " ");
+            items.push({ hour, minute, label: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`, context: around });
+          }
+        }
+        return items.slice(0, 12);
+      }
+
+      function findWeatherNearTime(weather, item) {
+        const target = new Date();
+        target.setHours(item.hour, item.minute, 0, 0);
+        if (/明天/.test($("itineraryInput").value)) target.setDate(target.getDate() + 1);
+        const candidates = [
+          ...(weather.minutely_15?.time || []).map((time, index) => ({
+            time,
+            stamp: new Date(time).getTime(),
+            rain: weather.minutely_15.precipitation_probability?.[index] ?? 0,
+            precipitation: weather.minutely_15.precipitation?.[index] ?? 0,
+            code: weather.minutely_15.weather_code?.[index] ?? 0
+          })),
+          ...weather.hourly.time.map((time, index) => ({
+            time,
+            stamp: new Date(time).getTime(),
+            rain: weather.hourly.precipitation_probability?.[index] ?? 0,
+            temp: weather.hourly.temperature_2m?.[index] ?? weather.current.temperature_2m,
+            apparent: weather.hourly.apparent_temperature?.[index] ?? weather.current.apparent_temperature ?? weather.current.temperature_2m,
+            wind: weather.hourly.wind_speed_10m?.[index] ?? weather.current.wind_speed_10m,
+            code: weather.hourly.weather_code?.[index] ?? weather.current.weather_code
+          }))
+        ].filter((candidate) => Number.isFinite(candidate.stamp));
+        return candidates.reduce((best, candidate) =>
+          Math.abs(candidate.stamp - target.getTime()) < Math.abs(best.stamp - target.getTime()) ? candidate : best,
+        candidates[0]);
+      }
+
+      function adviceForTripItem(weather, item) {
+        const point = findWeatherNearTime(weather, item);
+        if (!point) return `${item.label}：暂无对应天气数据。`;
+        const codeName = weatherLabels[point.code] || "天气变化";
+        const rain = point.rain ?? 0;
+        const apparent = Math.round(point.apparent ?? weather.current.apparent_temperature ?? weather.current.temperature_2m);
+        const wind = Math.round(point.wind ?? weather.current.wind_speed_10m);
+        const isOutdoor = /骑车|步行|走路|跑步|通勤|出门|地铁|公交|开车|机场|火车|户外|逛|吃饭|回家|上班|下班/.test(item.context);
+        const tips = [];
+        if (rain >= 65) tips.push("大概率有雨，一定带伞，鞋子尽量选不怕湿的");
+        else if (rain >= 40) tips.push("可能有雨，建议带伞");
+        else tips.push("下雨概率不高，一般不用带伞");
+        if (apparent >= 30) tips.push("体感热，穿轻薄短袖，少穿外套");
+        else if (apparent <= 18) tips.push("体感偏凉，建议加一件外套");
+        else tips.push("体感较舒适，正常穿着即可");
+        if (wind >= 30) tips.push("风偏大，骑车/打伞注意");
+        if (isOutdoor && rain >= 40) tips.push("这段行程在室外的话，尽量提前出门或走有遮挡路线");
+        return `${item.label}：${codeName}，体感约 ${apparent}℃，降雨概率 ${rain}%，风速约 ${wind} km/h。${tips.join("；")}。`;
+      }
+
+      function analyzeItinerary(pushResult = false) {
+        const text = $("itineraryInput").value.trim();
+        if (!text) {
+          $("itineraryResult").textContent = "先输入你的行程，比如：明天 8:20 骑车去地铁站，12:30 出去吃饭，18:20 下班回家。";
+          return null;
+        }
+        if (!state.weather) {
+          $("itineraryResult").textContent = "天气还没加载好，稍等一下再分析。";
+          return null;
+        }
+        const items = parseItinerary(text);
+        const advice = makeDetailedAdvice(state.weather);
+        const lines = items.length
+          ? items.map((item) => adviceForTripItem(state.weather, item))
+          : ["没有识别到具体时间。我先给通用建议：" + advice.body];
+        const result = "行程天气建议：\n" + lines.join("\n");
+        $("itineraryResult").textContent = result;
+        if (pushResult) sendNotification("行程天气建议", lines.join(" "), "weather-ping-trip");
+        return result;
+      }
+
+      async function sendNotification(title, body, tag = "weather-ping") {
+        if (!("Notification" in window) || Notification.permission !== "granted") {
+          setMessage("天气已更新；如需系统提醒，请先点“开启手机通知”。");
+          return;
+        }
+        const registration = "serviceWorker" in navigator ? await navigator.serviceWorker.ready : null;
+        const options = { body, icon: "/favicon.svg", badge: "/favicon.svg", tag };
+        if (registration) registration.showNotification(title, options);
+        else new Notification(title, options);
+        setMessage(new Date().toLocaleTimeString() + " 已推送：\n" + title + "\n" + body);
+      }
+
+      function clearScheduleTimers() {
+        state.timers.forEach((timer) => clearTimeout(timer));
+        state.timers = [];
+      }
+
+      function scheduleAllReminders() {
+        clearScheduleTimers();
+        if (!state.schedules.length) {
+          $("scheduleHint").textContent = "还没有定时提醒。添加后会显示下一次推送时间。";
+          return;
+        }
+        const nextList = state.schedules.map((time) => `${time} → ${formatNextTime(time)}`).join("；");
+        $("scheduleHint").textContent = "服务器后台推送：" + nextList + "。Netlify 每 15 分钟检查一次。";
+      }
+
+      function renderSchedules() {
+        $("scheduleList").innerHTML = "";
+        if (!state.schedules.length) {
+          const empty = document.createElement("span");
+          empty.className = "chip";
+          empty.textContent = "暂无定时";
+          $("scheduleList").appendChild(empty);
+          return;
+        }
+        [...state.schedules].sort().forEach((time) => {
+          const chip = document.createElement("span");
+          chip.className = "schedule-chip";
+          chip.innerHTML = `<span>${time}</span><button aria-label="删除 ${time}">×</button>`;
+          chip.querySelector("button").onclick = () => {
+            state.schedules = state.schedules.filter((item) => item !== time);
+            save();
+            render();
+            syncServerSettings();
+            scheduleAllReminders();
+          };
+          $("scheduleList").appendChild(chip);
+        });
+      }
+
+      function render() {
+        $("placeLabel").textContent = formatPlace(state.place);
+        $("leadStat").textContent = Number(state.leadTime) >= 60 ? (Number(state.leadTime) / 60) + " 小时" : state.leadTime + " 分钟";
+        updatePermissionLabel();
+
+        $("chips").innerHTML = "";
+        const locationButton = document.createElement("button");
+        locationButton.className = "chip";
+        locationButton.textContent = "使用当前位置";
+        locationButton.onclick = useCurrentLocation;
+        $("chips").appendChild(locationButton);
+        [...presets, ...state.places].forEach((place) => {
+          const button = document.createElement("button");
+          button.className = "chip";
+          button.textContent = formatPlace(place);
+          button.onclick = () => {
+            state.place = place;
+            $("cityInput").value = place.name;
+            state.places = [];
+            save();
+            render();
+            syncServerSettings();
+            refreshWeather();
+          };
+          $("chips").appendChild(button);
+        });
+
+        $("leadButtons").innerHTML = "";
+        [["60", "1 小时"], ["180", "3 小时"], ["360", "6 小时"]].forEach(([value, label]) => {
+          const button = document.createElement("button");
+          button.className = "segment" + (state.leadTime === value ? " active" : "");
+          button.textContent = label;
+          button.onclick = () => {
+            state.leadTime = value;
+            save();
+            render();
+            if (state.weather) evaluateWeather(state.weather, false);
+          };
+          $("leadButtons").appendChild(button);
+        });
+
+        renderSchedules();
+
+        $("rules").innerHTML = "";
+        Object.keys(ruleCopy).forEach((key) => {
+          const [title, detail, badge] = ruleCopy[key];
+          const label = document.createElement("label");
+          label.className = "rule";
+          label.innerHTML = `
+            <input type="checkbox" ${state.rules[key] ? "checked" : ""} />
+            <span class="rule-main">
+              <span class="rule-title">${title}</span>
+              <span class="rule-detail">${detail}</span>
+            </span>
+            <span class="badge">${badge}</span>
+          `;
+          label.querySelector("input").onchange = () => {
+            state.rules[key] = !state.rules[key];
+            save();
+            render();
+            syncServerSettings();
+          };
+          $("rules").appendChild(label);
+        });
+
+        if (state.weather) {
+          const hours = upcomingHours(state.weather, Number(state.leadTime) / 60);
+          const advice = makeDetailedAdvice(state.weather);
+          $("temperature").textContent = Math.round(state.weather.current.temperature_2m) + "℃";
+          $("weatherName").textContent = weatherLabels[state.weather.current.weather_code] || "天气变化";
+          $("rainStat").textContent = advice.rain.maxRain + "%";
+          $("windStat").textContent = advice.wind.maxWind + " km/h";
+          $("summary").textContent = advice.short;
+        }
+      }
+
+      async function refreshWeather(shouldNotify = true) {
+        setMessage("正在获取 " + state.place.name + " 的真实天气…");
+        try {
+          const params = new URLSearchParams({
+            latitude: String(state.place.latitude),
+            longitude: String(state.place.longitude),
+            current: "temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m",
+            hourly: "temperature_2m,apparent_temperature,relative_humidity_2m,precipitation_probability,wind_speed_10m,weather_code",
+            minutely_15: "precipitation,precipitation_probability,weather_code",
+            daily: "weather_code,temperature_2m_max,temperature_2m_min,uv_index_max,precipitation_probability_max",
+            forecast_days: "2",
+            timezone: "auto"
+          });
+          const response = await fetch("https://api.open-meteo.com/v1/forecast?" + params);
+          if (!response.ok) throw new Error("weather failed");
+          state.weather = await response.json();
+          render();
+          evaluateWeather(state.weather, shouldNotify);
+        } catch {
+          setMessage("天气获取失败。可能是网络暂时不可用，稍后再试。");
+        }
+      }
+
+      async function evaluateWeather(weather, mayNotify) {
+        const advice = makeDetailedAdvice(weather);
+        const parts = [];
+        if (state.rules.rain && advice.rain.level !== "none") parts.push(advice.rain.text);
+        if (state.rules.clothes) parts.push(advice.clothes.text);
+        if (state.rules.sun && advice.sun.uv >= 5) parts.push(advice.sun.text);
+        if (state.rules.wind && advice.wind.maxWind >= 30) parts.push(advice.wind.text);
+
+        if (!parts.length) {
+          setMessage(state.place.name + " 天气正常：\n" + advice.short);
+          return;
+        }
+
+        setMessage(state.place.name + " 出门建议：\n" + parts.join("\n"));
+        const key = state.place.name + "-" + new Date().toDateString() + "-" + parts.join("|");
+        if (mayNotify && key !== state.lastAlertKey) {
+          state.lastAlertKey = key;
+          await sendNotification("天气出门建议", parts.join(" "), "weather-ping-change");
+        }
+      }
+
+      async function searchCity() {
+        const query = $("cityInput").value.trim();
+        if (!query) return;
+        setMessage("正在搜索城市…");
+        try {
+          const params = new URLSearchParams({ name: query, count: "5", language: "zh", format: "json" });
+          const response = await fetch("https://geocoding-api.open-meteo.com/v1/search?" + params);
+          const data = await response.json();
+          const results = data.results || [];
+          state.places = results;
+          if (results[0]) {
+            state.place = results[0];
+            save();
+            render();
+            await syncServerSettings();
+            refreshWeather();
+          } else {
+            setMessage("没有搜到这个城市，可以换个名字试试。");
+          }
+        } catch {
+          setMessage("城市搜索失败，请稍后再试。");
+        }
+      }
+
+      async function reverseGeocode(latitude, longitude) {
+        try {
+          const params = new URLSearchParams({ latitude: String(latitude), longitude: String(longitude), localityLanguage: "zh" });
+          const response = await fetch("https://api.bigdatacloud.net/data/reverse-geocode-client?" + params);
+          if (!response.ok) throw new Error("reverse geocode failed");
+          const data = await response.json();
+          return {
+            name: data.city || data.locality || data.principalSubdivision || "我的位置",
+            admin1: data.principalSubdivision || "",
+            country: data.countryName || "",
+            latitude,
+            longitude
+          };
+        } catch {
+          return { name: "我的位置", latitude, longitude };
+        }
+      }
+
+      function useCurrentLocation() {
+        if (!navigator.geolocation) {
+          setMessage("当前浏览器不支持定位。");
+          return;
+        }
+        setMessage("正在定位…");
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const latitude = position.coords.latitude;
+            const longitude = position.coords.longitude;
+            setMessage("定位成功，正在识别城市…");
+            state.place = await reverseGeocode(latitude, longitude);
+            $("cityInput").value = state.place.name;
+            save();
+            render();
+            await syncServerSettings();
+            refreshWeather();
+          },
+          () => setMessage("定位失败。你可以手动输入城市。"),
+          { enableHighAccuracy: false, timeout: 10000 }
+        );
+      }
+
+      async function askPermission() {
+        const sub = await getServerPushSubscription();
+        if (!sub) return false;
+        await syncServerSettings();
+        await sendNotification("天气提醒已开启", state.place.name + " 的后台天气推送已经准备好。");
+        return true;
+      }
+
+      $("searchButton").onclick = searchCity;
+      $("permissionButton").onclick = askPermission;
+      $("refreshButton").onclick = () => refreshWeather(true);
+      $("testButton").onclick = async () => {
+        const sub = await getServerPushSubscription();
+        if (!sub) return;
+        await syncServerSettings();
+        const response = await fetch("/api/test-push", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ subscription: sub, place: state.place })
+        });
+        setMessage(response.ok ? "服务器测试推送已发送。" : "服务器测试推送失败，请检查 Netlify 环境变量。");
+      };
+      $("addScheduleButton").onclick = async () => {
+        const sub = await getServerPushSubscription();
+        if (!sub) {
+          setMessage("需要先允许通知权限，才能添加后台定时推送。");
+          return;
+        }
+        const time = $("scheduleTime").value || "07:30";
+        if (!state.schedules.includes(time)) state.schedules.push(time);
+        state.schedules.sort();
+        save();
+        render();
+        await syncServerSettings();
+        scheduleAllReminders();
+        setMessage("已添加 " + time + " 的后台定时推送。服务器会每 15 分钟检查一次，到点主动推送。");
+      };
+      $("analyzeTripButton").onclick = async () => {
+        const itinerary = $("itineraryInput").value.trim();
+        if (!itinerary) {
+          $("itineraryResult").textContent = "先输入你的行程。";
+          return;
+        }
+        const response = await fetch("/api/analyze-trip", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ place: state.place, itinerary })
+        });
+        const result = await response.json();
+        $("itineraryResult").textContent = result.body || "分析失败，请稍后再试。";
+        await syncServerSettings();
+      };
+      $("tripPushButton").onclick = async () => {
+        const sub = await getServerPushSubscription();
+        if (!sub) {
+          setMessage("需要先允许通知权限，才能推送行程建议。");
+          return;
+        }
+        const itinerary = $("itineraryInput").value.trim();
+        const response = await fetch("/api/analyze-trip", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ place: state.place, itinerary })
+        });
+        const result = await response.json();
+        $("itineraryResult").textContent = result.body || "分析失败，请稍后再试。";
+        await syncServerSettings();
+        await sendNotification("行程天气建议", result.body || "你的行程天气建议已生成。", "weather-ping-trip-local");
+      };
+      $("voiceButton").onclick = () => {
+        const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!Recognition) {
+          setMessage("当前浏览器不支持语音输入。Android Chrome 通常支持，iPhone Safari 可能不可用。");
+          return;
+        }
+        const recognition = new Recognition();
+        recognition.lang = "zh-CN";
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+        setMessage("正在听你说行程…");
+        recognition.onresult = (event) => {
+          const text = event.results?.[0]?.[0]?.transcript || "";
+          $("itineraryInput").value = $("itineraryInput").value
+            ? $("itineraryInput").value + " " + text
+            : text;
+          setMessage("语音输入完成，可以点“分析行程建议”。");
+        };
+        recognition.onerror = () => setMessage("语音输入失败，可以改用文字输入。");
+        recognition.start();
+      };
+      $("cityInput").addEventListener("keydown", (event) => {
+        if (event.key === "Enter") searchCity();
+      });
+
+      load();
+      render();
+      updatePermissionLabel();
+      if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+      refreshWeather(false);
+      scheduleAllReminders();
+      setInterval(() => refreshWeather(false), 15 * 60 * 1000);
+    </script>
+  </body>
+</html>

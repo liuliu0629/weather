@@ -1,0 +1,26 @@
+[build]
+  publish = "public"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/api/config"
+  to = "/.netlify/functions/config"
+  status = 200
+
+[[redirects]]
+  from = "/api/subscribe"
+  to = "/.netlify/functions/subscribe"
+  status = 200
+
+[[redirects]]
+  from = "/api/test-push"
+  to = "/.netlify/functions/test-push"
+  status = 200
+
+[[redirects]]
+  from = "/api/analyze-trip"
+  to = "/.netlify/functions/analyze-trip"
+  status = 200

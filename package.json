@@ -1,0 +1,19 @@
+{
+  "name": "weather-ping-push-app",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "mkdir -p dist && cp -R public/. dist",
+    "dev": "netlify dev",
+    "gen:vapid": "node scripts/generate-vapid.mjs"
+  },
+  "dependencies": {
+    "@netlify/blobs": "^9.1.0",
+    "@netlify/functions": "^3.1.10",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "netlify-cli": "^17.38.1"
+  }
+}
