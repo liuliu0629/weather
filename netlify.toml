@@ -24,3 +24,8 @@
   from = "/api/analyze-trip"
   to = "/.netlify/functions/analyze-trip"
   status = 200
+
+[[redirects]]
+  from = "/api/reverse-geocode"
+  to = "/.netlify/functions/reverse-geocode"
+  status = 200

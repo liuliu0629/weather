@@ -811,14 +811,15 @@
 
       async function reverseGeocode(latitude, longitude) {
         try {
-          const params = new URLSearchParams({ latitude: String(latitude), longitude: String(longitude), localityLanguage: "zh" });
-          const response = await fetch("https://api.bigdatacloud.net/data/reverse-geocode-client?" + params);
+          const params = new URLSearchParams({ latitude: String(latitude), longitude: String(longitude) });
+          const response = await fetch("/api/reverse-geocode?" + params);
           if (!response.ok) throw new Error("reverse geocode failed");
           const data = await response.json();
           return {
-            name: data.city || data.locality || data.principalSubdivision || "我的位置",
-            admin1: data.principalSubdivision || "",
-            country: data.countryName || "",
+            name: data.name || data.city || "我的位置",
+            admin1: data.admin1 || "",
+            country: data.country || "",
+            detailName: data.detailName || data.formattedAddress || "",
             latitude,
             longitude
           };
@@ -839,7 +840,9 @@
             const longitude = position.coords.longitude;
             setMessage("定位成功，正在识别城市…");
             state.place = await reverseGeocode(latitude, longitude);
+            state.locationDetail = state.place.detailName || state.locationDetail;
             $("cityInput").value = state.place.name;
+            $("detailInput").value = state.locationDetail;
             save();
             render();
             await syncServerSettings();

@@ -16,6 +16,7 @@
 VAPID_PUBLIC_KEY=填你的公钥
 VAPID_PRIVATE_KEY=填你的私钥
 VAPID_SUBJECT=mailto:你的邮箱
+AMAP_KEY=可选，高德 Web 服务 API Key，用于把当前位置反查到街道/门牌/POI/楼宇
 ```
 
 生成密钥：
@@ -36,6 +37,8 @@ npm run gen:vapid
 5. Functions directory 使用 `netlify/functions`
 6. 添加上面的 VAPID 环境变量
 7. 部署
+
+如果希望“使用当前位置”自动显示到街道、门牌、学校、学院、楼宇等更详细地址，请在高德开放平台申请 **Web 服务 API** Key，并在 Netlify 环境变量里添加 `AMAP_KEY`。不配置也能用，但通常只能到城市/区域级别，详细位置可手动填写。
 
 部署完成后：
 
