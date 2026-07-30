@@ -81,7 +81,7 @@
       .place-option { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; border-radius: 20px; padding: 12px 14px; background: white; color: #334155; text-align: left; box-shadow: 0 6px 18px rgba(15,23,42,.07); }
       .place-option strong { display: block; color: #1d4ed8; font-size: 15px; }
       .place-option span { display: block; margin-top: 4px; color: #64748b; font-size: 12px; line-height: 1.35; }
-      .toast { position: fixed; left: 50%; bottom: 28px; z-index: 20; transform: translateX(-50%) translateY(20px); opacity: 0; pointer-events: none; border-radius: 999px; padding: 12px 18px; background: #0f172a; color: white; font-size: 14px; font-weight: 900; box-shadow: 0 18px 40px rgba(15,23,42,.24); transition: .22s ease; }
+      .toast { position: fixed; left: 50%; bottom: calc(28px + env(safe-area-inset-bottom)); z-index: 9999; transform: translateX(-50%) translateY(20px); opacity: 0; pointer-events: none; border-radius: 999px; padding: 12px 18px; background: #0f172a; color: white; font-size: 14px; font-weight: 900; box-shadow: 0 18px 40px rgba(15,23,42,.24); transition: .22s ease; }
       .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
       .schedule-chip { display: inline-flex; align-items: center; gap: 8px; background: #eff6ff; color: #1d4ed8; }
       .schedule-chip button { width: 22px; height: 22px; border-radius: 999px; padding: 0; background: #dbeafe; color: #1e40af; font-weight: 1000; }
@@ -332,10 +332,11 @@
 
       function showToast(text) {
         const toast = $("toast");
+        if (!toast) return;
         toast.textContent = text;
         toast.classList.add("show");
         window.clearTimeout(showToast.timer);
-        showToast.timer = window.setTimeout(() => toast.classList.remove("show"), 2200);
+        showToast.timer = window.setTimeout(() => toast.classList.remove("show"), 2600);
       }
 
       function updatePermissionLabel() {
@@ -925,10 +926,10 @@
         state.schedules.sort();
         save();
         render();
-        await syncServerSettings();
-        scheduleAllReminders();
         showToast("推送时间已添加");
         setMessage("已添加 " + time + " 的后台定时推送。服务器会按你设定的具体时间主动推送。");
+        scheduleAllReminders();
+        await syncServerSettings();
       };
       $("saveLeadButton").onclick = async () => {
         const minutes = parseLeadInput($("customLeadInput").value);
@@ -939,10 +940,10 @@
         state.leadTime = String(minutes);
         save();
         render();
-        await syncServerSettings();
-        if (state.weather) evaluateWeather(state.weather, false);
         showToast("提醒时间已保存");
         setMessage("已保存天气变化提前提醒时间：" + displayLead(state.leadTime));
+        if (state.weather) evaluateWeather(state.weather, false);
+        await syncServerSettings();
       };
       $("analyzeTripButton").onclick = async () => {
         const itinerary = $("itineraryInput").value.trim();
