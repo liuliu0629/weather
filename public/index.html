@@ -679,7 +679,7 @@
         [...presets, ...state.places].forEach((place) => {
           const button = document.createElement("button");
           button.className = "chip";
-          button.textContent = formatPlace(place);
+          button.textContent = formatPlaceBase(place);
           button.onclick = () => {
             state.place = place;
             $("cityInput").value = place.name;
@@ -841,6 +841,7 @@
             setMessage("定位成功，正在识别城市…");
             state.place = await reverseGeocode(latitude, longitude);
             state.locationDetail = state.place.detailName || state.locationDetail;
+            state.places = [];
             $("cityInput").value = state.place.name;
             $("detailInput").value = state.locationDetail;
             save();
