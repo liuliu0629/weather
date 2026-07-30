@@ -13,6 +13,7 @@ export default async function handler(request) {
   await writeClient(id, {
     subscription: body.subscription,
     place: body.place,
+    leadTime: body.leadTime || "180",
     schedules: Array.isArray(body.schedules) ? body.schedules : [],
     rules: body.rules || {},
     itinerary: body.itinerary || "",

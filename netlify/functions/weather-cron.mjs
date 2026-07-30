@@ -23,7 +23,8 @@ export default async function handler() {
       if (!dueTimes.length || !client.subscription?.endpoint || !client.place) continue;
 
       const weather = await fetchWeather(client.place);
-      const advice = makeDetailedAdvice(client.place, weather, 6);
+      const hourWindow = Math.max(1, Number(client.leadTime || 180) / 60);
+      const advice = makeDetailedAdvice(client.place, weather, hourWindow);
       await webpush.sendNotification(
         client.subscription,
         JSON.stringify({ title: advice.title, body: advice.body, url: "/" }),

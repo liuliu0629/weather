@@ -50,6 +50,7 @@
       .hero-top, .panel-top { display: flex; justify-content: space-between; gap: 16px; }
       .small { margin: 0; color: rgba(255,255,255,.74); font-size: 13px; }
       .place { margin: 4px 0 0; font-size: 25px; font-weight: 1000; }
+      .place-base { margin: 6px 0 0; color: rgba(255,255,255,.72); font-size: 13px; line-height: 1.4; }
       .now { border-radius: 22px; padding: 12px 16px; background: rgba(255,255,255,.15); text-align: right; backdrop-filter: blur(12px); }
       .temp { margin: 2px 0 0; font-size: 29px; font-weight: 1000; }
       .weather-name { margin: 60px 0 0; font-size: clamp(56px, 9vw, 86px); font-weight: 1000; line-height: .95; letter-spacing: -0.08em; }
@@ -122,6 +123,7 @@
               <div>
                 <p class="small">当前位置</p>
                 <p class="place" id="placeLabel">上海 · 上海 · 中国</p>
+                <p class="place-base" id="placeBaseLabel"></p>
               </div>
               <div class="now">
                 <p class="small">现在</p>
@@ -163,6 +165,10 @@
           <div class="box">
             <label class="title">天气变化前多久提醒</label>
             <div class="segments" id="leadButtons"></div>
+            <div class="search" style="margin-top: 8px;">
+              <input id="customLeadInput" type="text" placeholder="自定义：例如 20分钟、90分钟、2小时" />
+              <button class="ghost" id="saveLeadButton">保存提醒时间</button>
+            </div>
           </div>
 
           <div class="box">
@@ -290,6 +296,32 @@
         return state.locationDetail ? `${state.locationDetail}（${base}）` : base;
       }
 
+      function formatPlaceBase(place) {
+        return [place.name, place.admin1, place.country].filter(Boolean).join(" · ");
+      }
+
+      function displayLead(minutesText) {
+        const minutes = Number(minutesText);
+        if (!Number.isFinite(minutes)) return "未设置";
+        if (minutes % 60 === 0) return `${minutes / 60} 小时`;
+        if (minutes > 60) return `${Math.floor(minutes / 60)}小时${minutes % 60}分钟`;
+        return `${minutes} 分钟`;
+      }
+
+      function parseLeadInput(value) {
+        const text = value.trim();
+        if (!text) return null;
+        const hourMatch = text.match(/(\d+(?:\.\d+)?)\s*(小时|小時|h|hour)/i);
+        const minuteMatch = text.match(/(\d+)\s*(分钟|分鐘|分|m|min|minute)/i);
+        if (hourMatch || minuteMatch) {
+          const hours = hourMatch ? Number(hourMatch[1]) : 0;
+          const minutes = minuteMatch ? Number(minuteMatch[1]) : 0;
+          return Math.round(hours * 60 + minutes);
+        }
+        const numeric = Number(text);
+        return Number.isFinite(numeric) ? Math.round(numeric) : null;
+      }
+
       function setMessage(text) {
         $("message").textContent = text;
       }
@@ -350,6 +382,7 @@
           body: JSON.stringify({
             subscription: pushSubscription,
             place: { ...state.place, detailName: state.locationDetail },
+            leadTime: state.leadTime,
             schedules: state.schedules,
             rules: state.rules,
             itinerary: $("itineraryInput")?.value || "",
@@ -632,8 +665,9 @@
       }
 
       function render() {
-        $("placeLabel").textContent = formatPlace(state.place);
-        $("leadStat").textContent = Number(state.leadTime) >= 60 ? (Number(state.leadTime) / 60) + " 小时" : state.leadTime + " 分钟";
+        $("placeLabel").textContent = state.locationDetail || state.place.name || "当前位置";
+        $("placeBaseLabel").textContent = state.locationDetail ? formatPlaceBase(state.place) : "";
+        $("leadStat").textContent = displayLead(state.leadTime);
         updatePermissionLabel();
 
         $("chips").innerHTML = "";
@@ -659,7 +693,7 @@
         });
 
         $("leadButtons").innerHTML = "";
-        [["60", "1 小时"], ["180", "3 小时"], ["360", "6 小时"]].forEach(([value, label]) => {
+        [["30", "30 分钟"], ["60", "1 小时"], ["180", "3 小时"], ["360", "6 小时"]].forEach(([value, label]) => {
           const button = document.createElement("button");
           button.className = "segment" + (state.leadTime === value ? " active" : "");
           button.textContent = label;
@@ -859,6 +893,19 @@
         render();
         await syncServerSettings();
         setMessage(state.locationDetail ? "已保存详细位置：" + state.locationDetail : "已清除详细位置名称。");
+      };
+      $("saveLeadButton").onclick = async () => {
+        const minutes = parseLeadInput($("customLeadInput").value);
+        if (!minutes || minutes < 5 || minutes > 1440) {
+          setMessage("请输入 5 分钟到 24 小时之间的提醒时间，例如：20分钟、90分钟、2小时。");
+          return;
+        }
+        state.leadTime = String(minutes);
+        save();
+        render();
+        await syncServerSettings();
+        if (state.weather) evaluateWeather(state.weather, false);
+        setMessage("已保存天气变化提前提醒时间：" + displayLead(state.leadTime));
       };
       $("analyzeTripButton").onclick = async () => {
         const itinerary = $("itineraryInput").value.trim();
