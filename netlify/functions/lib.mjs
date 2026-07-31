@@ -253,8 +253,8 @@ export function scheduleDue(timeText, toleranceMinutes = 15) {
   const [hour, minute] = timeText.split(":").map(Number);
   const target = hour * 60 + minute;
   const now = minutesNowChina();
-  const diff = Math.abs(now - target);
-  return diff <= toleranceMinutes || Math.abs(diff - 1440) <= toleranceMinutes;
+  const elapsed = (now - target + 1440) % 1440;
+  return elapsed <= toleranceMinutes;
 }
 
 export function displayPlaceName(place) {

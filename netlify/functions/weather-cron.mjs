@@ -19,7 +19,7 @@ export default async function handler() {
       const schedules = Array.isArray(client.schedules) ? client.schedules : [];
       const today = chinaDateKey();
       const sent = client.lastSentBySchedule || {};
-      const dueTimes = schedules.filter((time) => scheduleDue(time, 0) && sent[time] !== today);
+      const dueTimes = schedules.filter((time) => scheduleDue(time, 10) && sent[time] !== today);
       if (!dueTimes.length || !client.subscription?.endpoint || !client.place) continue;
 
       const weather = await fetchWeather(client.place);

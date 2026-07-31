@@ -736,7 +736,7 @@
           return;
         }
         const nextList = state.schedules.map((time) => `${time} → ${formatNextTime(time)}`).join("；");
-        $("scheduleHint").textContent = "服务器后台推送：" + nextList + "。系统每分钟检查一次，尽量按你设定的具体时间推送。";
+        $("scheduleHint").textContent = "服务器后台推送：" + nextList + "。到点后 10 分钟内补发一次，避免 Netlify 调度延迟漏发。";
       }
 
       function renderSchedules() {
@@ -971,13 +971,18 @@
 
       async function autoRefreshLocationOnOpen() {
         if (!navigator.geolocation) return;
+        setMessage("正在刷新当前位置…");
         try {
           const permission = navigator.permissions?.query
             ? await navigator.permissions.query({ name: "geolocation" })
             : null;
-          if (permission && permission.state !== "granted") return;
+          if (permission && permission.state === "denied") {
+            setMessage("定位权限被拒绝，无法自动刷新位置。请在浏览器/系统设置里允许定位。");
+            return;
+          }
         } catch {
-          return;
+          // Some mobile browsers do not support the Permissions API for geolocation.
+          // Still try getCurrentPosition; the browser will enforce the real permission.
         }
         navigator.geolocation.getCurrentPosition(
           async (position) => {
@@ -985,11 +990,14 @@
             const oldKey = `${state.place.latitude},${state.place.longitude}`;
             const newKey = `${place.latitude},${place.longitude}`;
             applyLocatedPlace(place);
-            await syncServerSettings();
+            const synced = await syncServerSettings();
+            setMessage(synced
+              ? "已刷新并同步当前位置：" + shortPlaceName()
+              : "已刷新当前位置：" + shortPlaceName() + "。开启手机通知后会同步后台推送。");
             if (oldKey !== newKey) refreshWeather(false);
           },
-          () => {},
-          { enableHighAccuracy: true, timeout: 12000, maximumAge: 10 * 60 * 1000 }
+          () => setMessage("自动刷新位置失败。可以点“使用当前位置”手动刷新。"),
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 2 * 60 * 1000 }
         );
       }
 
