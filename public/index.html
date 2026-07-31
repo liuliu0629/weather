@@ -541,9 +541,9 @@
         const maxRain = Math.max(0, ...hours.map((item) => item.rain));
         const firstRain = hours.find((item) => item.rain >= t.rain || [51,53,55,61,63,65,80,81,82,95,96,99].includes(item.code));
         const timeText = firstRain ? `，约${formatHourLabel(firstRain.time)}起` : "";
-        if (maxRain >= t.heavyRain) return { level: "high", text: `有雨${timeText}，带伞。`, maxRain };
-        if (maxRain >= t.rain) return { level: "mid", text: `可能有雨${timeText}，带伞。`, maxRain };
-        return { level: "none", text: `少雨。`, maxRain };
+        if (maxRain >= t.heavyRain) return { level: "high", text: `有雨${timeText}，最高${maxRain}%，建议带伞。`, maxRain };
+        if (maxRain >= t.rain) return { level: "mid", text: `可能有雨${timeText}，最高${maxRain}%，建议带伞。`, maxRain };
+        return { level: "none", text: `降雨概率${maxRain}%，一般不用带伞。`, maxRain };
       }
 
       function preciseRainAdvice(weather) {
@@ -558,7 +558,7 @@
         const start = formatHourLabel(first.time);
         const end = formatHourLabel(last.time);
         const peakTime = formatHourLabel(peak.time);
-        if (start === end) return `${start}有雨`;
+        if (start === end) return `${start}左右有雨`;
         return `${start}-${end}有雨`;
       }
 
@@ -570,12 +570,12 @@
         const dayMin = Math.round(weather.daily?.temperature_2m_min?.[0] ?? Math.min(...hours.map((item) => item.temp)));
         const diff = dayMax - dayMin;
         let wear = "";
-        if (apparent >= t.hot + 3) wear = "很热，短袖短裤";
+        if (apparent >= t.hot + 3) wear = "很热，短袖短裤、透气鞋";
         else if (apparent >= t.hot) wear = "偏热，轻薄短袖";
-        else if (apparent >= 23) wear = "短袖或薄长袖";
-        else if (apparent >= t.cold) wear = "可带薄外套";
-        else if (apparent >= 10) wear = "外套、长裤";
-        else wear = "厚外套保暖";
+        else if (apparent >= 23) wear = "体感舒适，短袖或薄长袖";
+        else if (apparent >= t.cold) wear = "早晚可能凉，可带薄外套";
+        else if (apparent >= 10) wear = "偏凉，外套、长裤";
+        else wear = "较冷，厚外套保暖";
 
         const change = diff >= t.tempDiff ? `温差${diff}℃，分层穿。` :
           apparent >= t.hot ? "注意补水。" :
@@ -596,8 +596,8 @@
         const t = sanitizeThresholds(state.thresholds);
         const uv = Math.round(weather.daily?.uv_index_max?.[0] ?? 0);
         const maxTemp = Math.round(weather.daily?.temperature_2m_max?.[0] ?? weather.current.temperature_2m);
-        if (uv >= t.uv + 3) return { text: `强防晒。`, uv };
-        if (uv >= t.uv || maxTemp >= t.hot) return { text: `注意防晒。`, uv };
+        if (uv >= t.uv + 3) return { text: `紫外线强，防晒霜/帽子/太阳镜。`, uv };
+        if (uv >= t.uv || maxTemp >= t.hot) return { text: `日晒偏强，注意防晒。`, uv };
         return { text: ``, uv };
       }
 
@@ -620,8 +620,9 @@
         const comfort = comfortAdvice(weather, hours);
         const title = "天气出门建议";
         const rainText = preciseRain ? `${preciseRain}；${rain.text}` : rain.text;
-        const extras = [rainText, clothes.text, sun.text].filter(Boolean).join(" ");
-        const body = `${shortPlaceName()}：${name}，体感${clothes.apparent}℃。${extras}`;
+        const tempRange = `${clothes.dayMin}-${clothes.dayMax}℃`;
+        const extras = [rainText, clothes.text, sun.text, wind.maxWind >= sanitizeThresholds(state.thresholds).wind ? wind.text : ""].filter(Boolean).join(" ");
+        const body = `${shortPlaceName()}：${name}，${tempRange}，体感${clothes.apparent}℃。${extras}`;
         const short = body;
         return { title, body, short, rain, preciseRain, rainText, clothes, wind, sun };
       }
@@ -736,7 +737,7 @@
           return;
         }
         const nextList = state.schedules.map((time) => `${time} → ${formatNextTime(time)}`).join("；");
-        $("scheduleHint").textContent = "服务器后台推送：" + nextList + "。到点后 10 分钟内补发一次，避免 Netlify 调度延迟漏发。";
+        $("scheduleHint").textContent = "服务器后台推送：" + nextList + "。到点后 90 分钟内只补发一次，避免 Netlify 调度延迟漏发。";
       }
 
       function renderSchedules() {
@@ -819,6 +820,11 @@
         locationButton.textContent = "使用当前位置";
         locationButton.onclick = useCurrentLocation;
         $("chips").appendChild(locationButton);
+        const updateLocationButton = document.createElement("button");
+        updateLocationButton.className = "chip";
+        updateLocationButton.textContent = "更新定位";
+        updateLocationButton.onclick = useCurrentLocation;
+        $("chips").appendChild(updateLocationButton);
         renderPlaceResults();
 
         $("leadButtons").innerHTML = "";
@@ -1063,10 +1069,15 @@
         state.schedules.sort();
         save();
         render();
-        showToast("推送时间已添加");
-        setMessage("已添加 " + time + " 的后台定时推送。服务器会按你设定的具体时间主动推送。");
         scheduleAllReminders();
-        await syncServerSettings();
+        const synced = await syncServerSettings();
+        if (synced) {
+          showToast("推送时间已保存");
+          setMessage("已保存 " + time + " 的后台定时推送。到点后服务器会主动推送。");
+        } else {
+          showToast("同步失败");
+          setMessage("本机已添加 " + time + "，但还没同步到服务器。请先开启手机通知，再点添加/测试推送。");
+        }
       };
       $("saveLeadButton").onclick = async () => {
         const minutes = parseLeadInput($("customLeadInput").value);
