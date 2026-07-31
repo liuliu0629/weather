@@ -737,7 +737,7 @@
           return;
         }
         const nextList = state.schedules.map((time) => `${time} → ${formatNextTime(time)}`).join("；");
-        $("scheduleHint").textContent = "服务器后台推送：" + nextList + "。到点后 90 分钟内只补发一次，避免 Netlify 调度延迟漏发。";
+        $("scheduleHint").textContent = "服务器后台推送：" + nextList + "。到点后 5 分钟内只补发一次，避免轻微调度延迟漏发。";
       }
 
       function renderSchedules() {
