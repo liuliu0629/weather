@@ -1,14 +1,14 @@
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== "weather-ping-v6").map((key) => caches.delete(key))))
+      .then((keys) => Promise.all(keys.filter((key) => key !== "weather-ping-v7").map((key) => caches.delete(key))))
       .then(() => self.clients.claim()),
   );
 });
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open("weather-ping-v6").then((cache) =>
+    caches.open("weather-ping-v7").then((cache) =>
       cache.addAll(["/", "/index.html", "/manifest.webmanifest", "/favicon.svg", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"]),
     ),
   );
@@ -23,7 +23,7 @@ self.addEventListener("fetch", (event) => {
     fetch(event.request)
       .then((response) => {
         const copy = response.clone();
-        caches.open("weather-ping-v6").then((cache) => cache.put(event.request, copy));
+        caches.open("weather-ping-v7").then((cache) => cache.put(event.request, copy));
         return response;
       })
       .catch(() => caches.match(event.request).then((cached) => cached || caches.match("/"))),

@@ -1,4 +1,4 @@
-import { clientIdFromSubscription, json, writeClient } from "./lib.mjs";
+import { clientIdFromSubscription, deleteClient, json, listClients, writeClient } from "./lib.mjs";
 
 export default async function handler(request) {
   if (request.method === "OPTIONS") return json({});
@@ -10,7 +10,19 @@ export default async function handler(request) {
   }
 
   const id = clientIdFromSubscription(body.subscription);
+  const userAgent = request.headers.get("user-agent") || "";
+  const clients = await listClients();
+  await Promise.all(clients
+    .filter((client) => client.id !== id)
+    .filter((client) => (
+      body.deviceId && client.deviceId === body.deviceId
+    ) || (
+      body.deviceId && !client.deviceId && client.userAgent && client.userAgent === userAgent
+    ))
+    .map((client) => deleteClient(client.id)));
+
   await writeClient(id, {
+    deviceId: body.deviceId || "",
     subscription: body.subscription,
     place: body.place,
     leadTime: body.leadTime || "180",
@@ -18,7 +30,7 @@ export default async function handler(request) {
     rules: body.rules || {},
     thresholds: body.thresholds || {},
     itinerary: body.itinerary || "",
-    userAgent: request.headers.get("user-agent") || "",
+    userAgent,
     createdAt: body.createdAt || new Date().toISOString()
   });
 

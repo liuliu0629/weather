@@ -287,6 +287,16 @@
       let pushSubscription = null;
       let activeRecognition = null;
 
+      function getDeviceId() {
+        const key = "weather-ping-device-id";
+        let id = localStorage.getItem(key);
+        if (!id) {
+          id = (crypto.randomUUID && crypto.randomUUID()) || String(Date.now()) + "-" + Math.random().toString(16).slice(2);
+          localStorage.setItem(key, id);
+        }
+        return id;
+      }
+
       function save() {
         localStorage.setItem("weather-ping-netlify", JSON.stringify({
           place: state.place,
@@ -472,6 +482,7 @@
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
+            deviceId: getDeviceId(),
             subscription: pushSubscription,
             place: { ...state.place, detailName: state.locationDetail },
             leadTime: state.leadTime,

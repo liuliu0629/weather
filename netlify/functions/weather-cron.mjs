@@ -12,9 +12,15 @@ import {
 export default async function handler() {
   const webpush = setupWebPush();
   const clients = await listClients();
+  const uniqueClients = [...clients]
+    .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0))
+    .filter((client, index, list) => {
+      const key = client.deviceId || client.subscription?.endpoint || client.id;
+      return list.findIndex((item) => (item.deviceId || item.subscription?.endpoint || item.id) === key) === index;
+    });
   const results = [];
 
-  for (const client of clients) {
+  for (const client of uniqueClients) {
     try {
       const schedules = Array.isArray(client.schedules) ? client.schedules : [];
       const today = chinaDateKey();
@@ -44,7 +50,7 @@ export default async function handler() {
     }
   }
 
-  return new Response(JSON.stringify({ ok: true, checked: clients.length, results }), {
+  return new Response(JSON.stringify({ ok: true, checked: clients.length, unique: uniqueClients.length, results }), {
     headers: { "content-type": "application/json; charset=utf-8" }
   });
 }
